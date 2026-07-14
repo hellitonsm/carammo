@@ -3,19 +3,40 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CarAmmo — Corrida</title>
+  <title>CarAmmo Deluxe — Corrida 3D</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- ====== MENU PRINCIPAL ====== -->
   <div id="menu">
     <div class="menu-bg" aria-hidden="true"></div>
     <div class="menu-content">
       <p class="menu-brand">CarAmmo</p>
-      <h1>Escolha seu carro</h1>
-      <p class="menu-sub">3 voltas · circuito fechado</p>
+      <p class="menu-subtitle">DELUXE · 3 CENÁRIOS</p>
+
+      <h2 class="section-title">Selecione o cenário</h2>
+      <div id="scene-select">
+        <button type="button" class="scene-option" data-scene="forest">
+          <span class="scene-thumb" style="--c1:#2f6b2f;--c2:#3f6e35;">🌲</span>
+          <span class="scene-name">Floresta</span>
+          <span class="scene-desc">Circuito clássico · curvas largas</span>
+        </button>
+        <button type="button" class="scene-option" data-scene="desert">
+          <span class="scene-thumb" style="--c1:#c8863a;--c2:#e8b064;">🏜️</span>
+          <span class="scene-name">Deserto</span>
+          <span class="scene-desc">Dunas · S-curvas · poeira</span>
+        </button>
+        <button type="button" class="scene-option" data-scene="snow">
+          <span class="scene-thumb" style="--c1:#8fb6cf;--c2:#e6eef5;">❄️</span>
+          <span class="scene-name">Nevasca</span>
+          <span class="scene-desc">Gelado · derrapagens · longa reta</span>
+        </button>
+      </div>
+
+      <h2 class="section-title">Escolha seu carro</h2>
       <div id="car-select">
         <button type="button" class="car-option" data-color="0xd62828" data-name="Vermelho">
           <span class="car-preview" style="--car:#d62828"></span>
@@ -29,14 +50,36 @@
           <span class="car-preview" style="--car:#2a9d5c"></span>
           <span>Verde</span>
         </button>
+        <button type="button" class="car-option" data-color="0xf4c430" data-name="Amarelo">
+          <span class="car-preview" style="--car:#f4c430"></span>
+          <span>Amarelo</span>
+        </button>
+        <button type="button" class="car-option" data-color="0x1a1a1a" data-name="Preto">
+          <span class="car-preview" style="--car:#1a1a1a;--top:#555"></span>
+          <span>Preto</span>
+        </button>
       </div>
-      <button id="start-btn" disabled>Largada</button>
-      <p class="menu-hint">W/S acelerar · A/D virar · Espaço freio · R reset</p>
+
+      <div class="menu-options">
+        <label class="opt">
+          <input type="checkbox" id="opt-ai" checked />
+          <span>3 adversários IA</span>
+        </label>
+        <label class="opt">
+          <input type="checkbox" id="opt-nitro" checked />
+          <span>Nitro (Shift)</span>
+        </label>
+      </div>
+
+      <button id="start-btn" disabled>largada</button>
+      <p class="menu-hint">W/S acelerar · A/D virar · Espaço freio · Shift nitro · R reset · C trocar câmera</p>
     </div>
   </div>
 
+  <!-- ====== COUNTDOWN ====== -->
   <div id="countdown" hidden></div>
 
+  <!-- ====== HUD ====== -->
   <div id="hud" hidden>
     <div class="hud-left">
       <div id="speed">0<span>km/h</span></div>
@@ -44,19 +87,25 @@
         <div id="lap">Volta 0 / 3</div>
         <div id="lap-time">00:00.000</div>
         <div id="best-time">Melhor —</div>
+        <div id="position-info">Posição: —</div>
+      </div>
+      <div id="nitro-bar-wrap">
+        <div id="nitro-bar"></div>
       </div>
     </div>
-    <canvas id="minimap" width="180" height="180"></canvas>
-    <div id="info">W/S · A/D · Espaço · R</div>
+    <canvas id="minimap" width="200" height="200"></canvas>
+    <div id="scene-name-hud"></div>
+    <div id="info">W/S · A/D · Espaço · Shift (nitro) · R · C</div>
   </div>
 
+  <!-- ====== FINISH ====== -->
   <div id="finish" hidden>
     <div class="finish-card">
       <p class="finish-brand">CarAmmo</p>
       <h2>Corrida concluída</h2>
-      <p id="finish-best">Melhor volta: —</p>
-      <p id="finish-total">Tempo total: —</p>
+      <div id="race-results"></div>
       <button type="button" id="restart-btn">Correr de novo</button>
+      <button type="button" id="menu-btn" class="secondary">Voltar ao menu</button>
     </div>
   </div>
 

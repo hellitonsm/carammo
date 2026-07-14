@@ -22,21 +22,24 @@ html, body {
 
 canvas { display: block; }
 
+/* ========== MENU ========== */
 #menu {
   position: fixed;
   inset: 0;
   z-index: 100;
   display: grid;
   place-items: center;
-  overflow: hidden;
+  overflow-y: auto;
+  padding: 2rem 1rem;
 }
 
 .menu-bg {
-  position: absolute;
+  position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 60% at 70% 40%, rgba(232, 93, 4, 0.22), transparent 55%),
+    radial-gradient(ellipse 80% 60% at 70% 30%, rgba(232, 93, 4, 0.22), transparent 55%),
     radial-gradient(ellipse 60% 50% at 20% 80%, rgba(42, 157, 92, 0.18), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 90% 70%, rgba(30, 107, 184, 0.15), transparent 50%),
     linear-gradient(160deg, #0a100e 0%, #1a2820 45%, #0e1814 100%);
   animation: menuPulse 8s ease-in-out infinite alternate;
 }
@@ -62,8 +65,10 @@ canvas { display: block; }
 .menu-content {
   position: relative;
   text-align: center;
-  padding: 2rem;
+  padding: 2rem 1.5rem;
   animation: menuIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  max-width: 900px;
+  width: 100%;
 }
 
 @keyframes menuIn {
@@ -77,46 +82,116 @@ canvas { display: block; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
   line-height: 0.95;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.1rem;
   background: linear-gradient(120deg, #fff 30%, var(--accent-hot) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
-#menu h1 {
-  font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+.menu-subtitle {
+  font-size: 0.85rem;
+  letter-spacing: 0.5em;
+  color: var(--accent);
+  margin-bottom: 2.2rem;
+}
+
+.section-title {
+  font-size: 0.85rem;
   font-weight: 500;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.25em;
   text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: 0.25rem;
+  margin: 1.5rem 0 0.8rem;
 }
 
-.menu-sub {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.85rem;
-  color: var(--accent);
-  margin-bottom: 2rem;
-  letter-spacing: 0.06em;
-}
-
-#car-select {
+/* Scenes */
+#scene-select {
   display: flex;
-  gap: 1.25rem;
+  gap: 1rem;
   justify-content: center;
   flex-wrap: wrap;
-  margin-bottom: 2rem;
+  margin-bottom: 0.4rem;
+}
+
+.scene-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  padding: 0.9rem 1rem;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.03);
+  color: var(--text);
+  font: inherit;
+  min-width: 150px;
+  transition: border-color 0.25s, transform 0.25s, background 0.25s;
+}
+
+.scene-option:hover {
+  border-color: rgba(255,255,255,0.2);
+  transform: translateY(-4px);
+}
+
+.scene-option.selected {
+  border-color: var(--accent);
+  background: rgba(232, 93, 4, 0.1);
+}
+
+.scene-thumb {
+  width: 130px;
+  height: 80px;
+  border-radius: 4px;
+  background: linear-gradient(160deg, var(--c2), var(--c1));
+  display: grid;
+  place-items: center;
+  font-size: 2.4rem;
+  box-shadow: inset 0 -10px 20px rgba(0,0,0,0.2), 0 6px 14px rgba(0,0,0,0.4);
+  position: relative;
+}
+
+.scene-thumb::after {
+  content: '';
+  position: absolute;
+  bottom: 8px; left: 10px; right: 10px;
+  height: 4px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 2px;
+}
+
+.scene-name {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.scene-desc {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+/* Cars */
+#car-select {
+  display: flex;
+  gap: 0.85rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
 }
 
 .car-option {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.5rem;
   cursor: pointer;
-  padding: 1rem 1.15rem;
-  border: 1px solid transparent;
+  padding: 0.8rem 1rem;
+  border: 2px solid transparent;
   border-radius: 4px;
   background: transparent;
   color: var(--text);
@@ -135,14 +210,14 @@ canvas { display: block; }
 }
 
 .car-preview {
-  width: 96px;
-  height: 52px;
+  width: 80px;
+  height: 44px;
   border-radius: 3px;
   background:
-    linear-gradient(145deg, color-mix(in srgb, var(--car) 85%, white), var(--car));
+    linear-gradient(145deg, color-mix(in srgb, var(--car) 85%, var(--top, white)), var(--car));
   box-shadow:
     0 8px 20px rgba(0, 0, 0, 0.45),
-    inset 0 -8px 12px rgba(0, 0, 0, 0.25);
+    inset 0 -8px 12px rgba(0, 0, 0, 0.35);
   position: relative;
 }
 
@@ -156,10 +231,34 @@ canvas { display: block; }
 }
 
 .car-option span:last-child {
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.menu-options {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  margin: 1rem 0 1.6rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+}
+
+.opt input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
 }
 
 #start-btn {
@@ -185,17 +284,18 @@ canvas { display: block; }
 #start-btn:not(:disabled):hover {
   background: var(--accent-hot);
   transform: scale(1.03);
-  box-shadow: 0 0 28px rgba(232, 93, 4, 0.4);
+  box-shadow: 0 0 28px rgba(232, 93, 4, 0.5);
 }
 
 .menu-hint {
-  margin-top: 1.4rem;
+  margin-top: 1.2rem;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.72rem;
   color: var(--muted);
   letter-spacing: 0.04em;
 }
 
+/* ========== COUNTDOWN ========== */
 #countdown {
   position: fixed;
   inset: 0;
@@ -211,15 +311,14 @@ canvas { display: block; }
   animation: countPop 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-#countdown.go {
-  color: var(--accent-hot);
-}
+#countdown.go { color: var(--accent-hot); }
 
 @keyframes countPop {
   from { opacity: 0; transform: scale(1.4); }
   to { opacity: 1; transform: scale(1); }
 }
 
+/* ========== HUD ========== */
 #hud {
   position: fixed;
   inset: 0;
@@ -235,7 +334,7 @@ canvas { display: block; }
   background: var(--panel);
   border-left: 3px solid var(--accent);
   backdrop-filter: blur(8px);
-  min-width: 180px;
+  min-width: 210px;
 }
 
 #speed {
@@ -263,6 +362,46 @@ canvas { display: block; }
 
 #lap { color: var(--text); font-weight: 600; }
 #best-time { color: var(--accent); }
+#position-info { color: var(--accent-hot); margin-top: 0.2rem; }
+
+#nitro-bar-wrap {
+  margin-top: 0.75rem;
+  height: 8px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+#nitro-bar {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #00c6ff, #0072ff, #e85d04, #ff7a1a);
+  transition: width 0.08s linear;
+  box-shadow: 0 0 8px rgba(0, 198, 255, 0.5);
+}
+
+#nitro-bar.active {
+  animation: nitroPulse 0.15s infinite alternate;
+}
+
+@keyframes nitroPulse {
+  from { filter: brightness(1); }
+  to { filter: brightness(1.6); }
+}
+
+#scene-name-hud {
+  position: absolute;
+  top: 1.1rem;
+  right: 1.2rem;
+  padding: 0.5rem 1rem;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  background: var(--panel);
+  border-right: 3px solid var(--accent);
+  backdrop-filter: blur(8px);
+}
 
 #info {
   position: absolute;
@@ -286,13 +425,14 @@ canvas { display: block; }
   background: rgba(0, 0, 0, 0.65);
 }
 
+/* ========== FINISH ========== */
 #finish {
   position: fixed;
   inset: 0;
   z-index: 80;
   display: grid;
   place-items: center;
-  background: rgba(6, 10, 8, 0.72);
+  background: rgba(6, 10, 8, 0.78);
   backdrop-filter: blur(6px);
 }
 
@@ -303,6 +443,7 @@ canvas { display: block; }
   border: 1px solid var(--line);
   border-radius: 4px;
   animation: menuIn 0.5s ease both;
+  min-width: 320px;
 }
 
 .finish-brand {
@@ -322,15 +463,19 @@ canvas { display: block; }
   margin-bottom: 1.2rem;
 }
 
-.finish-card p {
+#race-results {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.95rem;
   color: var(--muted);
-  margin-bottom: 0.4rem;
+  margin-bottom: 1rem;
+  line-height: 1.8;
 }
 
-#restart-btn {
-  margin-top: 1.5rem;
+#race-results .you { color: var(--accent-hot); font-weight: 700; }
+#race-results .pos1 { color: #ffd700; font-weight: 700; }
+
+#restart-btn, #menu-btn {
+  margin-top: 0.6rem;
   padding: 0.75rem 1.8rem;
   font-family: inherit;
   font-size: 1rem;
@@ -343,19 +488,32 @@ canvas { display: block; }
   border-radius: 3px;
   cursor: pointer;
   transition: background 0.2s, transform 0.2s;
+  margin-right: 0.5rem;
 }
 
-#restart-btn:hover {
+#menu-btn.secondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+#restart-btn:hover, #menu-btn:hover {
   background: var(--accent-hot);
   transform: scale(1.03);
+  color: #120800;
 }
+
+#pause-overlay { animation: menuIn 0.25s ease both; }
+#pause-overlay.hidden { display: none !important; }
 
 [hidden] { display: none !important; }
 
 @media (max-width: 640px) {
-  .hud-left { min-width: 140px; padding: 0.7rem 0.85rem; }
+  .hud-left { min-width: 160px; padding: 0.7rem 0.85rem; }
   #speed { font-size: 2rem; }
-  #minimap { width: 120px; height: 120px; }
-  #car-select { gap: 0.6rem; }
-  .car-preview { width: 72px; height: 40px; }
+  #minimap { width: 130px; height: 130px; }
+  #car-select { gap: 0.4rem; }
+  .car-preview { width: 60px; height: 34px; }
+  .scene-option { min-width: 110px; padding: 0.6rem; }
+  .scene-thumb { width: 95px; height: 60px; font-size: 1.8rem; }
 }
