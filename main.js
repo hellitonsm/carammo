@@ -1,8 +1,9 @@
 import * as THREE from 'three';
+import { SCENES } from './scenarios.js';
 
 // ============================================================================
 //  CarAmmo DELUXE — corrida 3D com Ammo.js + Three.js
-//  3 cenários · IA · Nitro · Multi-câmera · Partículas · Som de motor
+//  3 cenários distintos · IA · Nitro · Multi-câmera · Partículas · Som de motor
 // ============================================================================
 
 let Ammo = window.Ammo;
@@ -26,50 +27,6 @@ const CFG = {
   maxNitro: 100,
   nitroDrainRate: 35,
   nitroRegenRate: 8,
-};
-
-// ======================= SCENES =======================
-const SCENES = {
-  forest: {
-    name: 'Floresta', skyTop: 0x4a90c8, skyBottom: 0xd4e8f5, fog: 0x9ec5de, fogDensity: 0.0018,
-    sunColor: 0xfff2d6, sunIntensity: 1.35, ambientColor: 0xffffff, hemiSky: 0xc8e4ff, hemiGround: 0x3d5c2e,
-    groundColor: 0x3f6e35, groundTex: 'grass', trackColor: 0x2c2c2c, friction: 0.85,
-    treeCount: 380, treeTrunk: 0x6b4423, treeLeaf: 0x2f6b2f, treeScaleRange: [0.8, 1.7],
-    rocks: true, cones: true, lamps: true, dustColor: 0xffffff, dustAlpha: 0.2,
-    points: [
-      [0,0,0],[25,0,4],[55,0.2,8],[90,0.1,0],[120,0.3,-15],[138,0.5,-40],[140,0.6,-70],[125,0.5,-95],
-      [100,0.4,-110],[65,0.2,-118],[30,0.1,-108],[5,0,-90],[-15,0.15,-75],[-28,0.3,-55],[-30,0.35,-32],
-      [-45,0.4,-14],[-70,0.5,0],[-95,0.55,22],[-100,0.6,48],[-88,0.5,70],[-65,0.4,85],[-38,0.3,82],
-      [-20,0.2,70],[-10,0.1,48],[-5,0.02,25],
-    ],
-    trackWidth: 12, widthVariation: 0,
-  },
-  desert: {
-    name: 'Deserto', skyTop: 0xe89a50, skyBottom: 0xf9d89a, fog: 0xe8c288, fogDensity: 0.0030,
-    sunColor: 0xffe0b0, sunIntensity: 1.6, ambientColor: 0xffe6c0, hemiSky: 0xffd9a8, hemiGround: 0xc07a3a,
-    groundColor: 0xd6a668, groundTex: 'sand', trackColor: 0x6b5a44, friction: 0.78,
-    treeCount: 180, treeTrunk: 0x8a5a30, treeLeaf: 0x556b2f, treeScaleRange: [0.7, 1.4],
-    rocks: true, cones: false, lamps: false, dustColor: 0xd6a668, dustAlpha: 0.6,
-    points: [
-      [0,0,0],[40,0.1,-8],[80,0.3,-30],[100,0.5,-60],[90,0.7,-95],[60,0.6,-120],[20,0.4,-130],
-      [-15,0.3,-120],[-40,0.2,-95],[-55,0.15,-60],[-45,0.3,-25],[-25,0.4,5],[-50,0.6,40],[-80,0.7,70],
-      [-95,0.6,105],[-70,0.5,120],[-30,0.3,115],[0,0.2,90],[25,0.15,55],[18,0.1,25],
-    ],
-    trackWidth: 11, widthVariation: 1, rockColor: 0xa87745,
-  },
-  snow: {
-    name: 'Nevasca', skyTop: 0x9fb8cc, skyBottom: 0xe8eff5, fog: 0xcfd9e2, fogDensity: 0.0038,
-    sunColor: 0xffffff, sunIntensity: 1.05, ambientColor: 0xdde6f0, hemiSky: 0xe6eef5, hemiGround: 0xbfcdd8,
-    groundColor: 0xe8eef5, groundTex: 'snow', trackColor: 0x505860, friction: 0.55,
-    treeCount: 280, treeTrunk: 0x4a3525, treeLeaf: 0x2a4030, treeScaleRange: [0.9, 2.0],
-    rocks: true, cones: true, lamps: true, snowParticles: true, dustColor: 0xffffff, dustAlpha: 0.5,
-    points: [
-      [0,0,0],[30,0.1,3],[65,0.05,-5],[110,-0.1,-25],[145,0.2,-60],[140,0.4,-100],[110,0.5,-130],
-      [65,0.3,-140],[20,0.1,-125],[-15,0.2,-95],[-5,0.4,-60],[25,0.5,-30],[30,0.3,0],[10,0.2,35],
-      [-30,0.1,55],[-70,0.3,70],[-110,0.5,75],[-140,0.6,55],[-145,0.5,20],[-125,0.3,-10],[-90,0.1,-20],[-55,0,-5],
-    ],
-    trackWidth: 13, widthVariation: 2, rockColor: 0x8a95a0,
-  },
 };
 
 // ======================= STATE =======================
@@ -208,13 +165,13 @@ function makeAsphaltTexture(scn) {
   const col = new THREE.Color(scn.trackColor);
   ctx.fillStyle = `rgb(${col.r*255|0},${col.g*255|0},${col.b*255|0})`;
   ctx.fillRect(0,0,size,size);
-  const speck = scn.name==='Nevasca'?80:scn.name==='Deserto'?50:40;
+  const speck = scn.id==='snow'?80:scn.id==='desert'?50:40;
   for (let i=0;i<6000;i++){
     const g = speck+Math.random()*40;
     ctx.fillStyle = `rgba(${g},${g},${g},${0.12+Math.random()*0.2})`;
     ctx.fillRect(Math.random()*size, Math.random()*size, 1+Math.random()*2, 1);
   }
-  if (scn.name==='Nevasca') {
+  if (scn.id==='snow') {
     for (let i=0;i<140;i++){
       ctx.strokeStyle = `rgba(30,30,35,${0.08+Math.random()*0.15})`;
       ctx.lineWidth = 1; ctx.beginPath();
@@ -262,19 +219,21 @@ function initPhysics() {
 
 // ======================= SKY =======================
 function buildSky(scn) {
-  scene.background = new THREE.Color(scn.fog);
-  scene.fog = new THREE.FogExp2(scn.fog, scn.fogDensity);
+  scene.background = new THREE.Color(scn.fogColor);
+  scene.fog = new THREE.FogExp2(scn.fogColor, scn.fogDensity);
   scene.children.filter(o => o.isLight || o.isSky).forEach(o => scene.remove(o));
-  scene.add(new THREE.HemisphereLight(scn.hemiSky, scn.hemiGround, 0.55));
-  scene.add(new THREE.AmbientLight(scn.ambientColor, 0.3));
+  scene.add(new THREE.HemisphereLight(scn.hemiSky, scn.hemiGround, scn.hemiInt ?? 0.55));
+  scene.add(new THREE.AmbientLight(scn.ambientColor, scn.ambientInt ?? 0.3));
   sun = new THREE.DirectionalLight(scn.sunColor, scn.sunIntensity);
-  sun.position.set(60,90,40); sun.castShadow = true;
+  sun.position.set(scn.sunAz ?? 60, scn.sunEl ?? 90, 40);
+  sun.castShadow = true;
   sun.shadow.mapSize.set(2048,2048); sun.shadow.bias = -0.0003; sun.shadow.normalBias = 0.03;
-  const s = 160;
+  const s = 180;
   sun.shadow.camera.left=-s; sun.shadow.camera.right=s; sun.shadow.camera.top=s; sun.shadow.camera.bottom=-s;
-  sun.shadow.camera.far=350; sun.shadow.camera.near=10;
+  sun.shadow.camera.far=400; sun.shadow.camera.near=10;
   scene.add(sun); scene.add(sun.target);
-  const skyGeo = new THREE.SphereGeometry(1100,32,16);
+  renderer.toneMappingExposure = scn.exposure ?? 1.1;
+  const skyGeo = new THREE.SphereGeometry(1200,32,16);
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false,
     uniforms: { topColor:{value:new THREE.Color(scn.skyTop)}, bottomColor:{value:new THREE.Color(scn.skyBottom)}, offset:{value:60}, exponent:{value:0.55} },
@@ -350,21 +309,21 @@ function buildTrack(scn) {
   trackStartPos.y += CFG.wheelRadius + 0.6;
   trackStartDir = trackCurve.getTangentAt(0).clone();
 
-  const bound = computeTrackBounds(trackCurve, 200);
-  const worldSize = Math.max(bound.sizeX, bound.sizeZ)*1.6 + 200;
+  const bound = computeTrackBounds(trackCurve, 220);
+  const worldSize = Math.max(bound.sizeX, bound.sizeZ)*1.7 + 220;
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(worldSize,worldSize,1,1),
-    new THREE.MeshStandardMaterial({ map: makeGroundTexture(scn.groundTex), color: scn.groundColor, roughness: 0.95 })
+    new THREE.MeshStandardMaterial({ map: makeGroundTexture(scn.groundTex), color: scn.groundColor, roughness: scn.groundRoughness ?? 0.95 })
   );
   ground.rotation.x = -Math.PI/2; ground.position.set(bound.cx,-1.5,bound.cz); ground.receiveShadow=true; scene.add(ground);
 
-  const asphaltGeo = buildRibbon(trackCurve, trackWidth/2, 1200, wFn);
+  const asphaltGeo = buildRibbon(trackCurve, trackWidth/2, 1400, wFn);
   const asphaltMat = new THREE.MeshStandardMaterial({ map: makeAsphaltTexture(scn), roughness: 0.9, metalness: 0.04, side: THREE.DoubleSide });
   const asphalt = new THREE.Mesh(asphaltGeo, asphaltMat); asphalt.receiveShadow = true; scene.add(asphalt);
 
   addRumbleStrips(scn,wFn); addLaneMarkings(scn,wFn); addSideLines(scn,wFn); addBarriers(scn,wFn);
 
-  // Collision
+  // Collision mesh
   const tp = asphaltGeo.attributes.position.array;
   const ti = asphaltGeo.index.array;
   const tmesh = new Ammo.btTriangleMesh();
@@ -377,9 +336,10 @@ function buildTrack(scn) {
   const tshape = new Ammo.btBvhTriangleMeshShape(tmesh,true);
   const tr = new Ammo.btTransform(); tr.setIdentity();
   const tbody = new Ammo.btRigidBody(new Ammo.btRigidBodyConstructionInfo(0,new Ammo.btDefaultMotionState(tr),tshape,new Ammo.btVector3(0,0,0)));
-  tbody.setFriction(scn.friction); physicsWorld.addRigidBody(tbody);
+  tbody.setFriction(scn.trackFriction); physicsWorld.addRigidBody(tbody);
 
   addStartLine();
+  addIcePatches(scn);
   buildEnvironment(scn, trackCurve, bound, wFn);
 
   minimapPath = [];
@@ -388,9 +348,9 @@ function buildTrack(scn) {
 }
 
 function addRumbleStrips(scn,wFn){
-  const rw=1.0, segs=240;
-  const mA=new THREE.MeshStandardMaterial({color: scn.name==='Nevasca'?0x2244aa:0xff2222,roughness:0.75});
-  const mB=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.75});
+  const rw=1.0, segs=260;
+  const mA=new THREE.MeshStandardMaterial({color: scn.rumbleColorA ?? 0xd82222,roughness:0.75});
+  const mB=new THREE.MeshStandardMaterial({color: scn.rumbleColorB ?? 0xffffff,roughness:0.75});
   const half=trackWidth/2;
   for (let side=-1;side<=1;side+=2){
     for (let i=0;i<segs;i++){
@@ -417,7 +377,7 @@ function addLaneMarkings(scn,wFn){
   const dl=2.2, dg=3.2;
   const dashCount=Math.floor(trackLength/(dl+dg));
   const dg2=new THREE.PlaneGeometry(0.22,dl);
-  const dm=new THREE.MeshStandardMaterial({color:scn.name==='Nevasca'?0xffd86b:0xffffff,roughness:0.6,side:THREE.DoubleSide});
+  const dm=new THREE.MeshStandardMaterial({color:scn.id==='snow'?0xffd86b:0xffffff,roughness:0.6,side:THREE.DoubleSide});
   for (let i=0;i<dashCount;i++){
     const t=(i*(dl+dg))/trackLength; const p=trackCurve.getPointAt(t); const tan=trackCurve.getTangentAt(t);
     const dash=new THREE.Mesh(dg2,dm); dash.position.set(p.x,p.y+0.16,p.z);
@@ -433,14 +393,56 @@ function addSideLines(scn,wFn){
   scene.add(new THREE.Mesh(buildRibbon(offsetCurve(trackCurve,w,true,wFn),0.12,800),m));
 }
 function addBarriers(scn,wFn){
-  if (scn.name==='Deserto') return;
+  if (!scn.hasBarriers) return;
   const off=trackWidth/2+0.8;
-  const col = scn.name==='Nevasca'?0x2a6090:0xc03030;
+  const col = scn.barrierColor ?? 0xc03030;
   const bm=new THREE.MeshStandardMaterial({color:col,roughness:0.6,metalness:0.2,side:THREE.DoubleSide});
+  // Red stripes on barriers for visual interest
   const L=new THREE.Mesh(buildSegmentedBarrier(trackCurve,off,1,0.6,wFn),bm);
   const R=new THREE.Mesh(buildSegmentedBarrier(trackCurve,off,-1,0.6,wFn),bm);
   L.castShadow=R.castShadow=true; L.receiveShadow=R.receiveShadow=true;
   scene.add(L); scene.add(R);
+  // Barrier posts every so often
+  const postGeo = new THREE.BoxGeometry(0.15, 1.1, 0.15);
+  const postMat = new THREE.MeshStandardMaterial({color: 0xdddddd, metalness:0.6, roughness:0.3});
+  const segs = Math.floor(trackLength/10);
+  for (let i=0;i<segs;i++){
+    const t = i/segs;
+    const p = trackCurve.getPointAt(t);
+    const tan = trackCurve.getTangentAt(t);
+    const n = new THREE.Vector3(-tan.z,0,tan.x).normalize();
+    const w = wFn?off*wFn(t):off;
+    for (let side=-1;side<=1;side+=2){
+      const pp = p.clone().addScaledVector(n, side*w);
+      const post = new THREE.Mesh(postGeo, postMat);
+      post.position.set(pp.x, p.y+0.6, pp.z);
+      post.castShadow = true;
+      scene.add(post);
+    }
+  }
+}
+
+function addIcePatches(scn){
+  if (!scn.hasIcePatches) return;
+  const iceMat = new THREE.MeshStandardMaterial({color:0xb8d4e8, roughness:0.05, metalness:0.4, transparent:true, opacity:0.75, side:THREE.DoubleSide});
+  // Place 8-12 ice patches across the track
+  const patches = 10;
+  for (let i=0;i<patches;i++){
+    const t = (i+0.3)/patches;
+    const p = trackCurve.getPointAt(t);
+    const tan = trackCurve.getTangentAt(t);
+    const patch = new THREE.Mesh(
+      new THREE.CircleGeometry(2.5+Math.random()*2, 12),
+      iceMat
+    );
+    patch.rotation.x = -Math.PI/2;
+    const offset = (Math.random()-0.5) * (trackWidth*0.5);
+    const n = new THREE.Vector3(-tan.z,0,tan.x).normalize();
+    patch.position.set(p.x+n.x*offset, p.y+0.06, p.z+n.z*offset);
+    patch.rotation.z = Math.atan2(tan.x,tan.z);
+    patch.receiveShadow = true;
+    scene.add(patch);
+  }
 }
 function addStartLine(){
   const p=trackCurve.getPointAt(0), tan=trackCurve.getTangentAt(0);
@@ -475,111 +477,546 @@ function nearestOnCurve(curve,p){
 }
 
 function buildEnvironment(scn,curve,bound,wFn){
-  // Trees/cacti/pines as instanced meshes
-  const trunkGeo=new THREE.CylinderGeometry(0.3,0.45,1.5,7);
-  const trunkMat=new THREE.MeshStandardMaterial({color:scn.treeTrunk,roughness:0.9});
-  let leafGeo,leafMat;
-  if (scn.name==='Deserto'){ leafGeo=new THREE.CylinderGeometry(0.55,0.55,3.5,8); leafMat=new THREE.MeshStandardMaterial({color:scn.treeLeaf,roughness:0.8}); }
-  else if (scn.name==='Nevasca'){ leafGeo=new THREE.ConeGeometry(1.8,4.5,8); leafMat=new THREE.MeshStandardMaterial({color:scn.treeLeaf,roughness:0.85}); }
-  else { leafGeo=new THREE.ConeGeometry(1.7,4.2,8); leafMat=new THREE.MeshStandardMaterial({color:scn.treeLeaf,roughness:0.8}); }
+  // ---- TREES / CACTI / PINES (instanced) ----
+  let trunkGeo, trunkMat, leafGeo, leafMat;
+  const treeType = scn.treeType || 'pine';
 
-  const n=scn.treeCount;
-  const tMesh=new THREE.InstancedMesh(trunkGeo,trunkMat,n);
-  const lMesh=new THREE.InstancedMesh(leafGeo,leafMat,n);
-  tMesh.castShadow=true; lMesh.castShadow=true; lMesh.receiveShadow=true;
-  scene.add(tMesh); scene.add(lMesh);
-  let capMesh=null;
-  if (scn.name==='Nevasca'){
-    const cG=new THREE.ConeGeometry(1.3,1.6,8); const cM=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.5});
-    capMesh=new THREE.InstancedMesh(cG,cM,n); capMesh.castShadow=true; scene.add(capMesh);
+  if (treeType === 'cactus') {
+    trunkGeo = new THREE.CylinderGeometry(0.5, 0.55, 4, 10);
+    trunkMat = new THREE.MeshStandardMaterial({color: scn.treeTrunkColor ?? 0x5a7a3a, roughness: 0.85});
+    leafGeo = trunkGeo; leafMat = trunkMat; // cactus is single green trunk
+  } else if (treeType === 'pine-snow') {
+    trunkGeo = new THREE.CylinderGeometry(0.28, 0.4, 2.0, 8);
+    trunkMat = new THREE.MeshStandardMaterial({color: scn.treeTrunkColor ?? 0x3a2818, roughness: 0.95});
+    // Multi-cone pine (built later as compound via stacked cones — but for instanced simplicity use single cone with caps)
+    leafGeo = new THREE.ConeGeometry(1.9, 5, 9);
+    leafMat = new THREE.MeshStandardMaterial({color: 0x2a4030, roughness: 0.9});
+  } else {
+    // Normal pine
+    trunkGeo = new THREE.CylinderGeometry(0.3, 0.45, 1.8, 8);
+    trunkMat = new THREE.MeshStandardMaterial({color: scn.treeTrunkColor ?? 0x6b4423, roughness: 0.9});
+    leafGeo = new THREE.ConeGeometry(1.7, 4.5, 8);
+    leafMat = new THREE.MeshStandardMaterial({color: 0x2f6b2f, roughness: 0.85});
   }
-  const d=new THREE.Object3D();
-  let placed=0,attempts=0;
-  while (placed<n && attempts<n*10){
+
+  const n = scn.treeCount;
+  const tMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, n);
+  const lMesh = treeType==='cactus' ? null : new THREE.InstancedMesh(leafGeo, leafMat, n);
+  tMesh.castShadow = true;
+  if (lMesh) { lMesh.castShadow = true; lMesh.receiveShadow = true; scene.add(lMesh); }
+  scene.add(tMesh);
+
+  // Extra meshes for cactus arms or snow caps
+  let armMesh = null, capMesh = null, capMesh2 = null;
+  if (treeType === 'cactus') {
+    const armGeo = new THREE.CylinderGeometry(0.25, 0.28, 1.6, 8);
+    armMesh = new THREE.InstancedMesh(armGeo, trunkMat, n*2);
+    armMesh.castShadow = true; scene.add(armMesh);
+  }
+  if (treeType === 'pine-snow') {
+    const capGeo = new THREE.ConeGeometry(1.5, 1.4, 9);
+    const capMat = new THREE.MeshStandardMaterial({color: 0xffffff, roughness: 0.4});
+    capMesh = new THREE.InstancedMesh(capGeo, capMat, n);
+    capMesh.castShadow = true; scene.add(capMesh);
+    // Second cone layer (for multi-tier look, drawn as another instanced mesh)
+    const capGeo2 = new THREE.ConeGeometry(2.2, 0.8, 9);
+    capMesh2 = new THREE.InstancedMesh(capGeo2, capMat, n);
+    capMesh2.castShadow = true; scene.add(capMesh2);
+  }
+
+  const dummy = new THREE.Object3D();
+  let placed = 0, armPlaced = 0, attempts = 0;
+  const minDist = scn.treeDensity ?? 15;
+  while (placed < n && attempts < n*12) {
     attempts++;
-    const x=bound.minX+Math.random()*(bound.maxX-bound.minX), z=bound.minZ+Math.random()*(bound.maxZ-bound.minZ);
-    const nr=nearestOnCurve(curve,new THREE.Vector3(x,0,z));
-    if (nr.dist<14) continue;
-    if (Math.hypot(x-trackStartPos.x,z-trackStartPos.z)<30) continue;
-    const scale=scn.treeScaleRange[0]+Math.random()*(scn.treeScaleRange[1]-scn.treeScaleRange[0]);
-    const th=1.5*scale;
-    d.position.set(x,th/2,z); d.rotation.set(0,Math.random()*Math.PI*2,0); d.scale.set(scale,scale,scale); d.updateMatrix();
-    tMesh.setMatrixAt(placed,d.matrix);
-    const lh=scn.name==='Deserto'?3.5*scale:(scn.name==='Nevasca'?4.5*scale:4.2*scale);
-    d.position.set(x, scn.name==='Deserto'?th+lh/2-0.3:th+lh/2, z); d.updateMatrix(); lMesh.setMatrixAt(placed,d.matrix);
-    if (capMesh){ d.position.set(x,th+lh-0.3,z); d.updateMatrix(); capMesh.setMatrixAt(placed,d.matrix); }
+    const x = bound.minX + Math.random()*(bound.maxX-bound.minX);
+    const z = bound.minZ + Math.random()*(bound.maxZ-bound.minZ);
+    const nr = nearestOnCurve(curve, new THREE.Vector3(x,0,z));
+    if (nr.dist < minDist) continue;
+    if (Math.hypot(x-trackStartPos.x, z-trackStartPos.z) < 30) continue;
+
+    const scale = 0.7 + Math.random()*1.6;
+    if (treeType === 'cactus') {
+      // Cactus trunk
+      const th = 4*scale;
+      dummy.position.set(x, th/2, z);
+      dummy.rotation.set(0, Math.random()*Math.PI*2, 0);
+      dummy.scale.set(scale*0.9, scale, scale*0.9);
+      dummy.updateMatrix();
+      tMesh.setMatrixAt(placed, dummy.matrix);
+      // 1 or 2 arms
+      const arms = Math.random() < 0.7 ? (Math.random() < 0.5 ? 1 : 2) : 0;
+      for (let a=0;a<arms;a++){
+        const side = a===0?1:-1;
+        const armH = 1.4*scale;
+        dummy.position.set(x+side*0.55*scale, th*0.5, z);
+        dummy.rotation.set(0,0,side*0.3);
+        dummy.scale.set(scale*0.7, scale*0.7, scale*0.7);
+        dummy.updateMatrix();
+        if (armPlaced < n*2) { armMesh.setMatrixAt(armPlaced, dummy.matrix); armPlaced++; }
+      }
+    } else if (treeType === 'pine-snow') {
+      const th = 2.0*scale;
+      dummy.position.set(x, th/2, z);
+      dummy.rotation.set(0, Math.random()*Math.PI*2, 0);
+      dummy.scale.set(scale, scale, scale);
+      dummy.updateMatrix();
+      tMesh.setMatrixAt(placed, dummy.matrix);
+      const lh = 5*scale;
+      dummy.position.set(x, th+lh/2-0.2, z);
+      dummy.updateMatrix();
+      lMesh.setMatrixAt(placed, dummy.matrix);
+      // Snow cap on tip
+      dummy.position.set(x, th+lh-0.5, z);
+      dummy.scale.set(scale, scale, scale);
+      dummy.updateMatrix();
+      capMesh.setMatrixAt(placed, dummy.matrix);
+      // Snow collar
+      dummy.position.set(x, th+lh*0.45, z);
+      dummy.updateMatrix();
+      capMesh2.setMatrixAt(placed, dummy.matrix);
+    } else {
+      // Normal forest pine
+      const th = 1.8*scale;
+      dummy.position.set(x, th/2, z);
+      dummy.rotation.set(0, Math.random()*Math.PI*2, 0);
+      dummy.scale.set(scale, scale, scale);
+      dummy.updateMatrix();
+      tMesh.setMatrixAt(placed, dummy.matrix);
+      const lh = 4.5*scale;
+      dummy.position.set(x, th+lh/2, z);
+      dummy.updateMatrix();
+      lMesh.setMatrixAt(placed, dummy.matrix);
+    }
     placed++;
   }
-  tMesh.count=lMesh.count=placed; tMesh.instanceMatrix.needsUpdate=true; lMesh.instanceMatrix.needsUpdate=true;
-  if (capMesh){capMesh.count=placed; capMesh.instanceMatrix.needsUpdate=true;}
+  tMesh.count = placed; tMesh.instanceMatrix.needsUpdate = true;
+  if (lMesh) { lMesh.count = placed; lMesh.instanceMatrix.needsUpdate = true; }
+  if (armMesh) { armMesh.count = armPlaced; armMesh.instanceMatrix.needsUpdate = true; }
+  if (capMesh) { capMesh.count = placed; capMesh.instanceMatrix.needsUpdate = true; }
+  if (capMesh2) { capMesh2.count = placed; capMesh2.instanceMatrix.needsUpdate = true; }
 
-  if (scn.lamps){
-    const pG=new THREE.CylinderGeometry(0.1,0.15,7,8), pM=new THREE.MeshStandardMaterial({color:0x555,roughness:0.5,metalness:0.8});
-    const bG=new THREE.SphereGeometry(0.25,10,10), bM=new THREE.MeshStandardMaterial({color:0xffffcc,emissive:0xffffaa,emissiveIntensity:1.2});
-    const pCount=Math.floor(trackLength/35);
+  // ---- LAMP POSTS ----
+  if (scn.hasLamps){
+    const spacing = scn.lampSpacing ?? 35;
+    const pG = new THREE.CylinderGeometry(0.1, 0.16, 7.5, 8);
+    const pM = new THREE.MeshStandardMaterial({color: 0x555, roughness: 0.5, metalness: 0.85});
+    const armG = new THREE.BoxGeometry(1.5, 0.1, 0.1);
+    const bG = new THREE.SphereGeometry(0.28, 10, 10);
+    const bM = new THREE.MeshStandardMaterial({color:0xffffcc, emissive:0xffffaa, emissiveIntensity:1.3});
+    const pCount = Math.floor(trackLength/spacing);
     for (let i=0;i<pCount;i++){
-      const t=i/pCount; const p=curve.getPointAt(t); const tan=curve.getTangentAt(t);
-      const n=new THREE.Vector3(-tan.z,0,tan.x).normalize();
-      for (let s=-1;s<=1;s+=2){
-        const pp=p.clone().addScaledVector(n,s*(trackWidth/2+2.5));
-        const pole=new THREE.Mesh(pG,pM); pole.position.set(pp.x,p.y+3.5,pp.z); pole.castShadow=true; scene.add(pole);
-        const bulb=new THREE.Mesh(bG,bM); bulb.position.set(pp.x,p.y+7,pp.z); scene.add(bulb);
+      const t = i/pCount;
+      const p = curve.getPointAt(t);
+      const tan = curve.getTangentAt(t);
+      const n = new THREE.Vector3(-tan.z,0,tan.x).normalize();
+      for (let side=-1;side<=1;side+=2){
+        const pp = p.clone().addScaledVector(n, side*(trackWidth/2+2.8));
+        const pole = new THREE.Mesh(pG, pM);
+        pole.position.set(pp.x, p.y+3.7, pp.z);
+        pole.castShadow = true; scene.add(pole);
+        // arm pointing over track
+        const arm = new THREE.Mesh(armG, pM);
+        arm.position.set(pp.x - n.x*side*0.75, p.y+7.2, pp.z - n.z*side*0.75);
+        arm.rotation.y = Math.atan2(n.x, n.z);
+        arm.castShadow = true; scene.add(arm);
+        const bulb = new THREE.Mesh(bG, bM);
+        bulb.position.set(pp.x - n.x*side*1.5, p.y+7.2, pp.z - n.z*side*1.5);
+        scene.add(bulb);
+        // Point light
+        const pl = new THREE.PointLight(0xffeecc, 0.6, 20, 2);
+        pl.position.copy(bulb.position);
+        scene.add(pl);
       }
     }
   }
 
-  if (scn.cones){
-    const cG=new THREE.ConeGeometry(0.22,0.65,8), cM=new THREE.MeshStandardMaterial({color:0xff6600,roughness:0.55});
-    const cCount=Math.floor(trackLength/14);
+  // ---- CONES ----
+  if (scn.hasCones){
+    const every = scn.conesEvery ?? 16;
+    const cG = new THREE.ConeGeometry(0.24, 0.7, 10);
+    const cM = new THREE.MeshStandardMaterial({color:0xff6600, roughness:0.55});
+    // white stripe
+    const sG = new THREE.CylinderGeometry(0.2, 0.22, 0.12, 10);
+    const sM = new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.5});
+    const cCount = Math.floor(trackLength/every);
     for (let i=0;i<cCount;i++){
-      const t=i/cCount; const p=curve.getPointAt(t); const tan=curve.getTangentAt(t);
-      const n=new THREE.Vector3(-tan.z,0,tan.x).normalize();
-      const side=i%2===0?1:-1;
-      const w=wFn?(trackWidth/2+1.3)*wFn(t):trackWidth/2+1.3;
-      const cp=p.clone().addScaledVector(n,side*w);
-      const cone=new THREE.Mesh(cG,cM); cone.position.set(cp.x,p.y+0.4,cp.z); cone.castShadow=true; scene.add(cone);
+      const t = i/cCount;
+      const p = curve.getPointAt(t);
+      const tan = curve.getTangentAt(t);
+      const n = new THREE.Vector3(-tan.z,0,tan.x).normalize();
+      const side = i%2===0?1:-1;
+      const w = wFn ? (trackWidth/2+1.4)*wFn(t) : trackWidth/2+1.4;
+      const cp = p.clone().addScaledVector(n, side*w);
+      const cone = new THREE.Mesh(cG, cM);
+      cone.position.set(cp.x, p.y+0.4, cp.z);
+      cone.castShadow = true; scene.add(cone);
+      const stripe = new THREE.Mesh(sG, sM);
+      stripe.position.set(cp.x, p.y+0.45, cp.z);
+      scene.add(stripe);
     }
   }
 
-  if (scn.rocks){
-    const rG=new THREE.DodecahedronGeometry(0.45,0), rM=new THREE.MeshStandardMaterial({color:scn.rockColor||0x7a7a7a,roughness:0.95});
-    for (let i=0;i<100;i++){
-      const t=Math.random(); const p=curve.getPointAt(t); const tan=curve.getTangentAt(t);
-      const n=new THREE.Vector3(-tan.z,0,tan.x).normalize();
-      const side=Math.random()>0.5?1:-1;
-      const base=wFn?(trackWidth/2+2)*wFn(t):trackWidth/2+2;
-      const dist=base+Math.random()*6;
-      const rp=p.clone().addScaledVector(n,side*dist);
-      const rock=new THREE.Mesh(rG,rM);
-      const s=0.4+Math.random()*1.8;
-      rock.position.set(rp.x,p.y+s*0.3,rp.z); rock.scale.set(s,s*0.65,s);
-      rock.rotation.set(Math.random(),Math.random(),Math.random()); rock.castShadow=true; scene.add(rock);
+  // ---- ROCKS ----
+  if (scn.hasRocks){
+    const rCount = scn.rockCount ?? 100;
+    const rG = new THREE.DodecahedronGeometry(0.5, 0);
+    const rM = new THREE.MeshStandardMaterial({color: scn.rockColor||0x7a7a7a, roughness:0.95});
+    for (let i=0;i<rCount;i++){
+      const t = Math.random();
+      const p = curve.getPointAt(t);
+      const tan = curve.getTangentAt(t);
+      const n = new THREE.Vector3(-tan.z,0,tan.x).normalize();
+      const side = Math.random()>0.5?1:-1;
+      const base = wFn?(trackWidth/2+2)*wFn(t):trackWidth/2+2;
+      const dist = base + Math.random()*8;
+      const rp = p.clone().addScaledVector(n, side*dist);
+      const rock = new THREE.Mesh(rG, rM);
+      const s = 0.4 + Math.random()*2;
+      rock.position.set(rp.x, p.y+s*0.3, rp.z);
+      rock.scale.set(s, s*0.7, s);
+      rock.rotation.set(Math.random(),Math.random(),Math.random());
+      rock.castShadow = true; scene.add(rock);
     }
   }
 
-  if (scn.name==='Deserto'){
-    const dM=new THREE.MeshStandardMaterial({color:0xc8923a,roughness:1});
-    for (let i=0;i<45;i++){
-      const t=Math.random(); const p=curve.getPointAt(t); const tan=curve.getTangentAt(t);
-      const n=new THREE.Vector3(-tan.z,0,tan.x).normalize();
-      const side=Math.random()>0.5?1:-1; const dist=30+Math.random()*80;
-      const dp=p.clone().addScaledVector(n,side*dist);
-      const dune=new THREE.Mesh(new THREE.SphereGeometry(10+Math.random()*12,12,8,0,Math.PI*2,0,Math.PI/2),dM);
-      dune.position.set(dp.x,-1.5,dp.z); dune.scale.y=0.3+Math.random()*0.2; dune.receiveShadow=true; scene.add(dune);
-    }
+  // ==== SCENE-SPECIFIC EXTRAS ====
+
+  if (scn.id === 'forest') {
+    // Small flower patches (colored spots)
+    if (scn.hasFlowers) addFlowers(curve, bound, wFn);
+    if (scn.hasSheds) addSheds(curve, bound, wFn);
+    if (scn.hasSigns) addSigns(curve);
+    // A few extra broadleaf trees (sphere clusters) in the distance
+    addBroadleafTrees(curve, bound);
   }
 
-  if (scn.snowParticles){
-    const count=1500;
-    const g=new THREE.BufferGeometry(); const pos=new Float32Array(count*3); const vel=new Float32Array(count);
+  if (scn.id === 'desert') {
+    addDunes(curve, wFn);
+    if (scn.hasBarrels) addBarrels(curve, wFn);
+    if (scn.hasTumbleweeds) addTumbleweeds(curve, bound, wFn);
+  }
+
+  if (scn.id === 'snow') {
+    if (scn.hasSnowPiles) addSnowPiles(curve, wFn);
+    if (scn.hasSnowmen) addSnowmen(curve, wFn);
+    addSnowTracks(curve, wFn);
+    // Pine trees are already covered above; add a couple of frozen lakes in the distance
+    addFrozenLakes(curve, bound);
+  }
+
+  // Snow particles
+  if (scn.snowParticles) createSnowParticles();
+}
+
+// ---------- helpers for scene extras ----------
+function addFlowers(curve, bound, wFn) {
+  const colors = [0xff3366, 0xffffff, 0xffeb3b, 0xe91e63, 0xba68c8];
+  for (let c=0;c<5;c++){
+    const geo = new THREE.IcosahedronGeometry(0.18, 0);
+    const mat = new THREE.MeshStandardMaterial({color: colors[c%colors.length], roughness:0.7});
+    const count = 60;
+    const im = new THREE.InstancedMesh(geo, mat, count);
+    const d = new THREE.Object3D();
     for (let i=0;i<count;i++){
-      pos[i*3]=(Math.random()-0.5)*300; pos[i*3+1]=Math.random()*60-5; pos[i*3+2]=(Math.random()-0.5)*300;
-      vel[i]=0.08+Math.random()*0.15;
+      let tries=0;
+      while(tries<20){
+        tries++;
+        const x = bound.minX+Math.random()*(bound.maxX-bound.minX);
+        const z = bound.minZ+Math.random()*(bound.maxZ-bound.minZ);
+        const nr = nearestOnCurve(curve, new THREE.Vector3(x,0,z));
+        if (nr.dist > 10 && nr.dist < 40){
+          d.position.set(x, 0.1, z);
+          d.scale.setScalar(0.5+Math.random()*0.7);
+          d.updateMatrix(); im.setMatrixAt(i, d.matrix); break;
+        }
+      }
     }
-    g.setAttribute('position',new THREE.BufferAttribute(pos,3));
-    const m=new THREE.PointsMaterial({color:0xffffff,size:0.25,transparent:true,opacity:0.85,depthWrite:false});
-    snowParticles=new THREE.Points(g,m); snowParticles.userData.vel=vel; scene.add(snowParticles);
+    im.instanceMatrix.needsUpdate=true;
+    scene.add(im);
   }
+}
+
+function addSheds(curve, bound, wFn) {
+  // Small wooden sheds off-track
+  const shedCount = 5;
+  for (let i=0;i<shedCount;i++){
+    const t = (i+0.4)/shedCount;
+    const p = curve.getPointAt(t);
+    const tan = curve.getTangentAt(t);
+    const n = new THREE.Vector3(-tan.z,0,tan.x).normalize();
+    const side = i%2===0?1:-1;
+    const dist = 25+Math.random()*20;
+    const pos = p.clone().addScaledVector(n, side*dist);
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(3,2,2.5),
+      new THREE.MeshStandardMaterial({color:0x8a5a30, roughness:0.9})
+    );
+    body.position.y = 1; body.castShadow=true; group.add(body);
+    const roof = new THREE.Mesh(
+      new THREE.ConeGeometry(2.8, 1.5, 4),
+      new THREE.MeshStandardMaterial({color:0x6b2e20, roughness:0.8})
+    );
+    roof.position.y = 2.7; roof.rotation.y = Math.PI/4; roof.castShadow=true; group.add(roof);
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7,1.2,0.1),
+      new THREE.MeshStandardMaterial({color:0x3a2010, roughness:0.9})
+    );
+    door.position.set(0,0.6,1.26); group.add(door);
+    group.position.set(pos.x, p.y, pos.z);
+    group.rotation.y = Math.random()*Math.PI*2;
+    group.castShadow=true; scene.add(group);
+  }
+}
+
+function addSigns(curve) {
+  // Chequered/arrow signs at corners
+  const signCount = 8;
+  for (let i=0;i<signCount;i++){
+    const t = (i+0.2)/signCount;
+    const p = curve.getPointAt(t);
+    const tan = curve.getTangentAt(t);
+    const n = new THREE.Vector3(-tan.z,0,tan.x).normalize();
+    // Estimate curvature by sampling ahead
+    const ahead = curve.getPointAt(Math.min(1, t+0.03));
+    const toAhead = new THREE.Vector3().subVectors(ahead, p);
+    const cross = tan.x*toAhead.z - tan.z*toAhead.x;
+    const side = cross > 0 ? 1 : -1;
+    const pos = p.clone().addScaledVector(n, side*(trackWidth/2+3));
+    const group = new THREE.Group();
+    const post = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08,0.08,2.2,6),
+      new THREE.MeshStandardMaterial({color:0x555,metalness:0.7,roughness:0.4})
+    );
+    post.position.y = 1.1; post.castShadow=true; group.add(post);
+    const board = new THREE.Mesh(
+      new THREE.BoxGeometry(1.4,0.9,0.1),
+      new THREE.MeshStandardMaterial({color:side>0?0x1565c0:0xc62828, roughness:0.5})
+    );
+    board.position.y=2.2; board.castShadow=true; group.add(board);
+    // White arrow
+    const arrow = new THREE.Mesh(
+      new THREE.ConeGeometry(0.22,0.35,3),
+      new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.6})
+    );
+    arrow.position.set(0, 2.2, 0.08);
+    arrow.rotation.z = side>0? -Math.PI/2 : Math.PI/2;
+    group.add(arrow);
+    group.position.set(pos.x, p.y, pos.z);
+    group.lookAt(p.x, p.y, p.z);
+    scene.add(group);
+  }
+}
+
+function addBroadleafTrees(curve, bound) {
+  const tG = new THREE.CylinderGeometry(0.25, 0.4, 2.2, 6);
+  const tM = new THREE.MeshStandardMaterial({color:0x5a3a20,roughness:0.95});
+  const lG = new THREE.IcosahedronGeometry(1.6,1);
+  const lM = new THREE.MeshStandardMaterial({color:0x3a8a2a,roughness:0.85});
+  const count = 60;
+  const iT = new THREE.InstancedMesh(tG, tM, count);
+  const iL = new THREE.InstancedMesh(lG, lM, count*2);
+  scene.add(iT); scene.add(iL);
+  const d = new THREE.Object3D();
+  let tp=0, lp=0;
+  for (let i=0;i<count;i++){
+    let tries=0;
+    while(tries<20){
+      tries++;
+      const x=bound.minX+Math.random()*(bound.maxX-bound.minX);
+      const z=bound.minZ+Math.random()*(bound.maxZ-bound.minZ);
+      const nr=nearestOnCurve(curve,new THREE.Vector3(x,0,z));
+      if (nr.dist>20 && nr.dist<80){
+        const s=0.8+Math.random()*1.1;
+        d.position.set(x, 1.1*s, z); d.scale.set(s,s,s); d.rotation.y=Math.random()*Math.PI*2;
+        d.updateMatrix(); iT.setMatrixAt(tp++, d.matrix);
+        // 1-2 leaf blobs
+        for (let k=0;k<2;k++){
+          d.position.set(x+(Math.random()-0.5)*1.2, 2.2*s+Math.random()*0.5, z+(Math.random()-0.5)*1.2);
+          d.scale.set(s*(0.8+Math.random()*0.4),s*(0.8+Math.random()*0.4),s*(0.8+Math.random()*0.4));
+          d.updateMatrix(); if (lp<count*2){iL.setMatrixAt(lp++,d.matrix);}
+        }
+        break;
+      }
+    }
+  }
+  iT.count=tp; iL.count=lp;
+  iT.instanceMatrix.needsUpdate=true; iL.instanceMatrix.needsUpdate=true;
+}
+
+function addDunes(curve, wFn) {
+  const dM = new THREE.MeshStandardMaterial({color:0xc8923a, roughness:1});
+  for (let i=0;i<55;i++){
+    const t=Math.random(); const p=curve.getPointAt(t);
+    const tan=curve.getTangentAt(t);
+    const n=new THREE.Vector3(-tan.z,0,tan.x).normalize();
+    const side=Math.random()>0.5?1:-1;
+    const dist=30+Math.random()*90;
+    const dp=p.clone().addScaledVector(n,side*dist);
+    const dune=new THREE.Mesh(
+      new THREE.SphereGeometry(10+Math.random()*14, 14, 10, 0, Math.PI*2, 0, Math.PI/2), dM);
+    dune.position.set(dp.x,-1.5,dp.z);
+    dune.scale.y=0.3+Math.random()*0.25;
+    dune.receiveShadow=true; scene.add(dune);
+  }
+}
+
+function addBarrels(curve, wFn) {
+  const bG = new THREE.CylinderGeometry(0.35,0.4,0.9,10);
+  const bM = new THREE.MeshStandardMaterial({color:0xb04020, roughness:0.5, metalness:0.3});
+  const ringG = new THREE.TorusGeometry(0.38,0.03,6,12);
+  const ringM = new THREE.MeshStandardMaterial({color:0x888,metalness:0.7,roughness:0.3});
+  const count = 25;
+  for (let i=0;i<count;i++){
+    const t=Math.random(); const p=curve.getPointAt(t);
+    const tan=curve.getTangentAt(t);
+    const n=new THREE.Vector3(-tan.z,0,tan.x).normalize();
+    const side=Math.random()>0.5?1:-1;
+    const base = wFn?(trackWidth/2+2)*wFn(t):trackWidth/2+2;
+    const dist = base+2+Math.random()*4;
+    const bp=p.clone().addScaledVector(n,side*dist);
+    const barrel = new THREE.Mesh(bG,bM);
+    barrel.position.set(bp.x, p.y+0.5, bp.z);
+    barrel.rotation.z = (Math.random()-0.5)*0.3;
+    barrel.castShadow=true; scene.add(barrel);
+    for (let r=0;r<2;r++){
+      const ring=new THREE.Mesh(ringG,ringM);
+      ring.position.set(bp.x, p.y+0.2+r*0.5, bp.z);
+      ring.rotation.x=Math.PI/2;
+      scene.add(ring);
+    }
+  }
+}
+
+function addTumbleweeds(curve, bound, wFn) {
+  const g = new THREE.IcosahedronGeometry(0.4, 0);
+  const m = new THREE.MeshStandardMaterial({color:0x8a6a38, wireframe:true, roughness:1});
+  const count = 20;
+  for (let i=0;i<count;i++){
+    const t=Math.random(); const p=curve.getPointAt(t);
+    const tan=curve.getTangentAt(t);
+    const n=new THREE.Vector3(-tan.z,0,tan.x).normalize();
+    const side=Math.random()>0.5?1:-1;
+    const base = wFn?(trackWidth/2+2)*wFn(t):trackWidth/2+2;
+    const dist = base+3+Math.random()*8;
+    const pp=p.clone().addScaledVector(n,side*dist);
+    const tw = new THREE.Mesh(g,m);
+    tw.position.set(pp.x, p.y+0.4, pp.z);
+    tw.castShadow=true; scene.add(tw);
+  }
+}
+
+function addSnowPiles(curve, wFn) {
+  const count = 50;
+  const g = new THREE.SphereGeometry(1, 10, 8);
+  const m = new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.5});
+  for (let i=0;i<count;i++){
+    const t=Math.random(); const p=curve.getPointAt(t);
+    const tan=curve.getTangentAt(t);
+    const n=new THREE.Vector3(-tan.z,0,tan.x).normalize();
+    const side=Math.random()>0.5?1:-1;
+    const base = wFn?(trackWidth/2+1)*wFn(t):trackWidth/2+1;
+    const dist = base+Math.random()*6;
+    const pp=p.clone().addScaledVector(n,side*dist);
+    const s = 0.6+Math.random()*1.4;
+    const pile = new THREE.Mesh(g,m);
+    pile.position.set(pp.x, p.y+s*0.4-0.1, pp.z);
+    pile.scale.set(s*1.2, s*0.6, s*1.2);
+    pile.castShadow=true; pile.receiveShadow=true;
+    scene.add(pile);
+  }
+}
+
+function addSnowmen(curve, wFn) {
+  const count = 6;
+  for (let i=0;i<count;i++){
+    const t=(i+0.3)/count; const p=curve.getPointAt(t);
+    const tan=curve.getTangentAt(t);
+    const n=new THREE.Vector3(-tan.z,0,tan.x).normalize();
+    const side = i%2===0?1:-1;
+    const base = wFn?(trackWidth/2+2)*wFn(t):trackWidth/2+2;
+    const dist = base+3+Math.random()*3;
+    const pp = p.clone().addScaledVector(n, side*dist);
+    const group = new THREE.Group();
+    const white = new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.35});
+    const black = new THREE.MeshStandardMaterial({color:0x111111, roughness:0.5});
+    const red = new THREE.MeshStandardMaterial({color:0xc62828, roughness:0.6});
+    // Base
+    const bottom = new THREE.Mesh(new THREE.SphereGeometry(0.6,12,10), white);
+    bottom.position.y=0.6; bottom.castShadow=true; group.add(bottom);
+    const mid = new THREE.Mesh(new THREE.SphereGeometry(0.45,12,10), white);
+    mid.position.y=1.4; mid.castShadow=true; group.add(mid);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.32,12,10), white);
+    head.position.y=2.05; head.castShadow=true; group.add(head);
+    // Buttons
+    for (let k=0;k<3;k++){
+      const btn=new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8),black);
+      btn.position.set(0,1.25+k*0.2,0.4); group.add(btn);
+    }
+    // Eyes
+    const eyeL=new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8),black); eyeL.position.set(-0.1,2.1,0.27); group.add(eyeL);
+    const eyeR=new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8),black); eyeR.position.set(0.1,2.1,0.27); group.add(eyeR);
+    // Nose (carrot)
+    const nose=new THREE.Mesh(new THREE.ConeGeometry(0.06,0.25,8),new THREE.MeshStandardMaterial({color:0xff7020,roughness:0.6}));
+    nose.position.set(0,2.0,0.4); nose.rotation.x=Math.PI/2; group.add(nose);
+    // Hat
+    const brim=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,0.04,12),black); brim.position.y=2.35; group.add(brim);
+    const hat=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,0.3,12),black); hat.position.y=2.52; group.add(hat);
+    // Scarf
+    const scarf=new THREE.Mesh(new THREE.TorusGeometry(0.3,0.06,6,12),red); scarf.position.y=1.72; scarf.rotation.x=Math.PI/2; group.add(scarf);
+    group.position.set(pp.x, p.y, pp.z);
+    group.castShadow=true; scene.add(group);
+  }
+}
+
+function addSnowTracks(curve, wFn) {
+  // Subtle darker packed-snow edges along track (visual only)
+  const edgeMat = new THREE.MeshStandardMaterial({color:0xb8c8d4, roughness:0.8});
+  const left = offsetCurve(curve, trackWidth/2+2, false, wFn);
+  const right = offsetCurve(curve, trackWidth/2+2, true, wFn);
+  const gL = buildRibbon(left, 1.2, 600);
+  const gR = buildRibbon(right, 1.2, 600);
+  const mL = new THREE.Mesh(gL, edgeMat); mL.receiveShadow = true; scene.add(mL);
+  const mR = new THREE.Mesh(gR, edgeMat); mR.receiveShadow = true; scene.add(mR);
+}
+
+function addFrozenLakes(curve, bound) {
+  const lakeMat = new THREE.MeshStandardMaterial({color:0xa8c8e0, roughness:0.1, metalness:0.3, transparent:true, opacity:0.85});
+  for (let i=0;i<2;i++){
+    let tries=0;
+    while(tries<40){
+      tries++;
+      const x=bound.minX+Math.random()*(bound.maxX-bound.minX);
+      const z=bound.minZ+Math.random()*(bound.maxZ-bound.minZ);
+      const nr=nearestOnCurve(curve,new THREE.Vector3(x,0,z));
+      if (nr.dist>40){
+        const lake = new THREE.Mesh(new THREE.CircleGeometry(15+Math.random()*12, 16), lakeMat);
+        lake.rotation.x=-Math.PI/2;
+        lake.position.set(x,-1.45,z);
+        lake.receiveShadow=true; scene.add(lake);
+        break;
+      }
+    }
+  }
+}
+
+function createSnowParticles() {
+  const count=2000;
+  const g=new THREE.BufferGeometry();
+  const pos=new Float32Array(count*3);
+  const vel=new Float32Array(count);
+  for (let i=0;i<count;i++){
+    pos[i*3]=(Math.random()-0.5)*300;
+    pos[i*3+1]=Math.random()*80-10;
+    pos[i*3+2]=(Math.random()-0.5)*300;
+    vel[i]=0.06+Math.random()*0.12;
+  }
+  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const m=new THREE.PointsMaterial({color:0xffffff,size:0.28,transparent:true,opacity:0.9,depthWrite:false});
+  snowParticles=new THREE.Points(g,m);
+  snowParticles.userData.vel=vel;
+  scene.add(snowParticles);
 }
 
 // ======================= CAR =======================
@@ -672,7 +1109,7 @@ function createVehicle(colorHex, startIdx=0, isPlayer=false, name='Player', skil
   for (let i=0;i<4;i++){
     const wi=veh.getWheelInfo(i);
     wi.set_m_suspensionStiffness(50); wi.set_m_wheelsDampingRelaxation(8); wi.set_m_wheelsDampingCompression(20);
-    wi.set_m_frictionSlip(currentSceneDef.friction*10); wi.set_m_rollInfluence(0.005);
+    wi.set_m_frictionSlip(currentSceneDef.trackFriction*10); wi.set_m_rollInfluence(0.005);
   }
 
   // Wheel dust particle system (added to scene so it stays in world space)
@@ -746,7 +1183,7 @@ function createWheelDust(carColor, isPlayer){
   if (!dustSys) {
     const col = currentSceneDef.dustColor || 0xffffff;
     dustSys = createWorldPointSystem(400, col, 0.3, 1.2);
-    dustSys.maxLife = currentSceneDef.name==='Nevasca'?1.5:1.0;
+    dustSys.maxLife = currentSceneDef.id==='snow'?1.5:1.0;
   }
   return dustSys;
 }
@@ -949,7 +1386,7 @@ function emitExhaustFx(v, speedKmh, drifting){
   // Emit from two exhaust pipes (local offsets ~ (-0.4, -0.35, -2.6) in car frame)
   for (const side of [-1, 1]) {
     const local = new THREE.Vector3(side*h.x*0.4, -h.y*0.3, -h.z-0.3).applyQuaternion(v.mesh.quaternion).add(v.mesh.position);
-    const col = currentSceneDef.name==='Nevasca'?(drifting?0xffffff:0xcccccc):(speedKmh>120?0x555555:0xdddddd);
+    const col = currentSceneDef.id==='snow'?(drifting?0xffffff:0xcccccc):(speedKmh>120?0x555555:0xdddddd);
     emitParticle(exhaustSys, local.x, local.y, local.z,
       back.x*(3+Math.random()*3)+(Math.random()-0.5)*1,
       back.y*2+0.5+Math.random(),
@@ -961,8 +1398,8 @@ function emitWheelDust(v, speedKmh, hard){
   if (!dustSys) return;
   if (speedKmh<15||v.finished) return;
   const scn=currentSceneDef;
-  if (scn.name==='Floresta' && !hard) return;
-  const intensity = hard ? 2 : (scn.name==='Deserto'?1:0.4);
+  if (scn.id==='forest' && !hard) return;
+  const intensity = hard ? 2 : (scn.id==='desert'?1:0.4);
   const q=v.mesh.quaternion;
   for (let wi=2; wi<=3; wi++){
     const wp=v.wheels[wi].position;
@@ -1273,7 +1710,7 @@ function spawnSkid(carData){
     if (!pos) continue;
     const mark=new THREE.Mesh(skidGeo,skidMat.clone());
     mark.position.set(pos.x,0.17,pos.z); mark.rotation.x=-Math.PI/2; mark.rotation.z=yaw;
-    mark.material.opacity=currentSceneDef.name==='Nevasca'?0.22:0.5;
+    mark.material.opacity=currentSceneDef.id==='snow'?0.22:0.5;
     scene.add(mark); skidMarks.push({mesh:mark,life:5});
     if (skidMarks.length>MAX_SKIDS){const old=skidMarks.shift();scene.remove(old.mesh);old.mesh.material.dispose();}
   }
@@ -1305,7 +1742,7 @@ function setupRace(){
   currentSceneDef=SCENES[selectedScene];
   buildSky(currentSceneDef); buildTrack(currentSceneDef);
   // Recreate dust system color based on scene
-  dustSys = createWorldPointSystem(400, currentSceneDef.dustColor||0xffffff, 0.3, currentSceneDef.name==='Nevasca'?1.4:1.0);
+  dustSys = createWorldPointSystem(400, currentSceneDef.dustColor||0xffffff, 0.3, currentSceneDef.id==='snow'?1.4:1.0);
   playerVehicle = createVehicle(selectedCarColor,0,true,'Você',1.0);
   vehicles.push(playerVehicle);
   if (aiEnabled){
