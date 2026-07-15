@@ -22,11 +22,11 @@ const FOREST_POINTS = [
   [85, 0.4, -130],
   [40, 0.5, -125],
   [5, 0.3, -100],
-  // S-curva sinuosa pela floresta
+  // S-curva sinuosa pela floresta (elevada para sensação de altura)
   [-20, 0.2, -80],
   [-35, 0.3, -55],
-  [-30, 0.4, -28],
-  [-50, 0.5, -8],
+  [-30, 5.5, -28],   // pista elevada (overpass)
+  [-50, 5.8, -8],
   // Curva rápida à esquerda (subida)
   [-85, 0.6, 10],
   [-110, 0.7, 40],

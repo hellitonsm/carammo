@@ -539,7 +539,7 @@ function buildEnvironment(scn,curve,bound,wFn){
     if (treeType === 'cactus') {
       // Cactus trunk
       const th = 4*scale;
-      dummy.position.set(x, th/2, z);
+      dummy.position.set(x, th/2 - 0.45, z);
       dummy.rotation.set(0, Math.random()*Math.PI*2, 0);
       dummy.scale.set(scale*0.9, scale, scale*0.9);
       dummy.updateMatrix();
@@ -578,13 +578,13 @@ function buildEnvironment(scn,curve,bound,wFn){
     } else {
       // Normal forest pine
       const th = 1.8*scale;
-      dummy.position.set(x, th/2, z);
+      dummy.position.set(x, th/2 - 0.45, z);
       dummy.rotation.set(0, Math.random()*Math.PI*2, 0);
       dummy.scale.set(scale, scale, scale);
       dummy.updateMatrix();
       tMesh.setMatrixAt(placed, dummy.matrix);
       const lh = 4.5*scale;
-      dummy.position.set(x, th+lh/2, z);
+      dummy.position.set(x, th+lh/2 - 0.45, z);
       dummy.updateMatrix();
       lMesh.setMatrixAt(placed, dummy.matrix);
     }
@@ -673,7 +673,7 @@ function buildEnvironment(scn,curve,bound,wFn){
       const rp = p.clone().addScaledVector(n, side*dist);
       const rock = new THREE.Mesh(rG, rM);
       const s = 0.4 + Math.random()*2;
-      rock.position.set(rp.x, p.y+s*0.3, rp.z);
+      rock.position.set(rp.x, p.y + s*0.18 - 0.35, rp.z);
       rock.scale.set(s, s*0.7, s);
       rock.rotation.set(Math.random(),Math.random(),Math.random());
       rock.castShadow = true; scene.add(rock);
@@ -755,12 +755,12 @@ function addSheds(curve, bound, wFn) {
       new THREE.BoxGeometry(3,2,2.5),
       new THREE.MeshStandardMaterial({color:0x8a5a30, roughness:0.9})
     );
-    body.position.y = 1; body.castShadow=true; group.add(body);
+    body.position.y = 0.55; body.castShadow=true; group.add(body);
     const roof = new THREE.Mesh(
       new THREE.ConeGeometry(2.8, 1.5, 4),
       new THREE.MeshStandardMaterial({color:0x6b2e20, roughness:0.8})
     );
-    roof.position.y = 2.7; roof.rotation.y = Math.PI/4; roof.castShadow=true; group.add(roof);
+    roof.position.y = 2.25; roof.rotation.y = Math.PI/4; roof.castShadow=true; group.add(roof);
     const door = new THREE.Mesh(
       new THREE.BoxGeometry(0.7,1.2,0.1),
       new THREE.MeshStandardMaterial({color:0x3a2010, roughness:0.9})
@@ -849,17 +849,17 @@ function addBroadleafTrees(curve, bound) {
 
 function addDunes(curve, wFn) {
   const dM = new THREE.MeshStandardMaterial({color:0xc8923a, roughness:1});
-  for (let i=0;i<55;i++){
+  for (let i=0;i<38;i++){  // reduzido para menos invasão
     const t=Math.random(); const p=curve.getPointAt(t);
     const tan=curve.getTangentAt(t);
     const n=new THREE.Vector3(-tan.z,0,tan.x).normalize();
     const side=Math.random()>0.5?1:-1;
-    const dist=30+Math.random()*90;
+    const dist=38+Math.random()*75;  // mais longe da pista
     const dp=p.clone().addScaledVector(n,side*dist);
     const dune=new THREE.Mesh(
-      new THREE.SphereGeometry(10+Math.random()*14, 14, 10, 0, Math.PI*2, 0, Math.PI/2), dM);
-    dune.position.set(dp.x,-1.5,dp.z);
-    dune.scale.y=0.3+Math.random()*0.25;
+      new THREE.SphereGeometry(9+Math.random()*11, 14, 10, 0, Math.PI*2, 0, Math.PI/2), dM);
+    dune.position.set(dp.x, p.y - 3.2, dp.z);
+    dune.scale.y=0.28+Math.random()*0.22;
     dune.receiveShadow=true; scene.add(dune);
   }
 }
@@ -1516,7 +1516,7 @@ function updateAI(dt){
     const ai=v.aiState;
     ai.errorTimer-=dt;
     if (ai.errorTimer<=0){ai.error=(Math.random()-0.5)*(1-v.aiSkill)*1.2; ai.errorTimer=0.4+Math.random()*0.7;}
-    const aheadT=(v.progress+(ai.lookahead+Math.random()*4)/trackLength)%1;
+    const aheadT=(v.progress+(ai.lookahead+Math.random()*2.5)/trackLength)%1;
     const ahead=trackCurve.getPointAt(aheadT);
     const here=v.mesh.position;
     const to=new THREE.Vector3().subVectors(ahead,here); to.y=0; to.normalize();
@@ -1525,8 +1525,9 @@ function updateAI(dt){
     while (ang>Math.PI) ang-=Math.PI*2; while (ang<-Math.PI) ang+=Math.PI*2;
     ang+=ai.error;
     let steer=0;
-    if (ang>0.05) steer=Math.min(CFG.maxSteer,ang*2.2);
-    else if (ang<-0.05) steer=Math.max(-CFG.maxSteer,ang*2.2);
+    const steerMult = Math.abs(ang) > 0.4 ? 3.4 : 2.8;
+    if (ang>0.025) steer=Math.min(CFG.maxSteer,ang*steerMult);
+    else if (ang<-0.025) steer=Math.max(-CFG.maxSteer,ang*steerMult);
     v.vehicle.setSteeringValue(steer,0); v.vehicle.setSteeringValue(steer,1);
 
     const vel=v.body.getLinearVelocity();
@@ -1535,15 +1536,22 @@ function updateAI(dt){
     const sharp=Math.abs(ang);
     const target=Math.max(40,160-sharp*120)*v.aiSkill;
     let engine=0, brake=0;
-    if (speedKmh<target-5){engine=CFG.engineForce*(1+(target-speedKmh)/80); ai.accel=Math.min(1,(target-speedKmh)/60);}
+    if (speedKmh<target-5){engine=CFG.engineForce*(0.55+(target-speedKmh)/160); ai.accel=Math.min(1,(target-speedKmh)/85);}
     else if (speedKmh>target+10){brake=CFG.brakingForce*0.4; ai.accel=0;}
-    else {engine=CFG.engineForce*0.4; ai.accel=0.3;}
+    else {engine=CFG.engineForce*0.28; ai.accel=0.24;}
     v.vehicle.applyEngineForce(engine,2); v.vehicle.applyEngineForce(engine,3);
     v.vehicle.setBrake(brake,0);v.vehicle.setBrake(brake,1);v.vehicle.setBrake(brake*0.3,2);v.vehicle.setBrake(brake*0.3,3);
 
     const lv=getLocalVelocity(v);
     if (Math.abs(lv.x)>4 && speedKmh>28) spawnSkid(v);
     if (speedMs>1){const df=speedMs*speedMs*8; const f=new Ammo.btVector3(0,-df,0); v.body.applyCentralForce(f); Ammo.destroy(f);}
+    // anti-wheelie force for AI
+    const chassisUp = new THREE.Vector3(0,1,0).applyQuaternion(v.mesh.quaternion);
+    if (chassisUp.y > 0.88) {
+      const anti = new Ammo.btVector3(0, -220, 0);
+      v.body.applyCentralForce(anti);
+      Ammo.destroy(anti);
+    }
 
     emitExhaustFx(v, speedKmh, Math.abs(lv.x)>3);
     if (Math.abs(lv.x)>3 || ai.accel>0.7) emitWheelDust(v, speedKmh, Math.abs(lv.x)>3);
@@ -1552,7 +1560,7 @@ function updateAI(dt){
     const up=new THREE.Vector3(0,1,0).applyQuaternion(v.mesh.quaternion);
     const gs=Math.hypot(lv.x,lv.z);
     if (up.y<0.3||v.mesh.position.y<-10){resetVehicle(v,false);ai.stuckTimer=0;}
-    else if (ai.stuckTimer>2.5 && gs<1.5){resetVehicle(v,false);ai.stuckTimer=0;}
+    else if (ai.stuckTimer>1.8 && gs<2.0){resetVehicle(v,false);ai.stuckTimer=0;}
   }
 }
 
