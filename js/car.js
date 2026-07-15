@@ -4,8 +4,8 @@
 
 import * as THREE from 'three';
 import { CFG } from './config.js';
-import { scene, physicsWorld, vehicles, playerVehicle, trackStartPos, trackStartDir, currentSceneDef,
-         setVehicles, setPlayerVehicle } from './state.js';
+import { scene, physicsWorld, vehicles, playerVehicle, trackCurve, trackLength,
+         currentSceneDef, setVehicles, setPlayerVehicle } from './state.js';
 import { createExhaust, createWheelDustSystem } from './particles.js';
 
 
@@ -63,15 +63,21 @@ export function createVehicle(colorHex, startIdx = 0, isPlayer = false, name = '
   const ch = new Ammo.btTransform(); ch.setIdentity(); ch.setOrigin(new Ammo.btVector3(0, 2.0, 0));
   compound.addChildShape(ch, box);
 
+  // Place car on the actual track curve (not fixed world offsets that miss the collision mesh)
   const col = startIdx % 2, row = Math.floor(startIdx / 2);
-  const startP = trackStartPos.clone();
-  const right = new THREE.Vector3(-trackStartDir.z, 0, trackStartDir.x).normalize();
-  startP.addScaledVector(right, (col === 0 ? -1 : 1) * 2.5);
-  startP.addScaledVector(trackStartDir, -row * 5 - 1);
+  const curveT = (startIdx * 3) / trackLength; // small t increment per car along curve
+  const curvePt = trackCurve.getPointAt(curveT);
+  const curveTan = trackCurve.getTangentAt(curveT);
+  const normal = new THREE.Vector3(-curveTan.z, 0, curveTan.x).normalize();
+  const startP = new THREE.Vector3(
+    curvePt.x + normal.x * (col === 0 ? -1 : 1) * 1.8,
+    curvePt.y + CFG.wheelRadius + 0.6,
+    curvePt.z + normal.z * (col === 0 ? -1 : 1) * 1.8
+  );
 
   const st = new Ammo.btTransform(); st.setIdentity();
   st.setOrigin(new Ammo.btVector3(startP.x, startP.y, startP.z));
-  const yaw = Math.atan2(trackStartDir.x, trackStartDir.z);
+  const yaw = Math.atan2(curveTan.x, curveTan.z);
   st.setRotation(new Ammo.btQuaternion(0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)));
 
   const ms = new Ammo.btDefaultMotionState(st);
@@ -120,7 +126,7 @@ export function createVehicle(colorHex, startIdx = 0, isPlayer = false, name = '
     mesh, body, vehicle: veh, wheels, color: colorHex, isPlayer, name,
     progress: 0, lap: 0, lastT: 0, lastLap: 0, finished: false, finishTime: 0,
     aiSkill: skill, aiState: { steer: 0, accel: 0, lookahead: 35 + Math.random() * 10, error: 0, errorTimer: 0, stuckTimer: 0 },
-    ramp: 0, startP,
+    ramp: 0, startP, startDir: curveTan.clone(),
   };
 }
 

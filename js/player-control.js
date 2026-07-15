@@ -135,9 +135,10 @@ export function getLocalVelocity(v) {
 export function resetVehicle(v, full) {
   const Ammo = window.Ammo;
   const sp = v.startP;
+  const sd = v.startDir || trackStartDir;
   const t = new Ammo.btTransform(); t.setIdentity();
   t.setOrigin(new Ammo.btVector3(sp.x, sp.y, sp.z));
-  const yaw = Math.atan2(trackStartDir.x, trackStartDir.z);
+  const yaw = Math.atan2(sd.x, sd.z);
   t.setRotation(new Ammo.btQuaternion(0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)));
   v.body.setWorldTransform(t);
   v.body.setLinearVelocity(new Ammo.btVector3(0, 0, 0));
