@@ -181,7 +181,12 @@ function updateRuleBasedAI(v, dt) {
   const ai = v.aiState;
   ai.errorTimer -= dt;
   if (ai.errorTimer <= 0) { ai.error = (Math.random() - 0.5) * (1 - v.aiSkill) * 1.2; ai.errorTimer = 0.4 + Math.random() * 0.7; }
-  const aheadT = (v.progress + (ai.lookahead + Math.random() * 2.5) / trackLength) % 1;
+
+  const vel = v.body.getLinearVelocity();
+  const speedMs = Math.hypot(vel.x(), vel.y(), vel.z());
+  const speedKmh = speedMs * 3.6;
+
+  const aheadT = (v.progress + (ai.lookahead * (1 + speedKmh / 200) + Math.random() * 2.5) / trackLength) % 1;
   _ahead.copy(trackCurve.getPointAt(aheadT));
   _here.copy(v.mesh.position);
   _to.subVectors(_ahead, _here); _to.y = 0; _to.normalize();
@@ -196,9 +201,6 @@ function updateRuleBasedAI(v, dt) {
   else if (ang < -0.025) steer = Math.max(-CFG.maxSteer, ang * steerMult);
   v.vehicle.setSteeringValue(steer, 0); v.vehicle.setSteeringValue(steer, 1);
 
-  const vel = v.body.getLinearVelocity();
-  const speedMs = Math.hypot(vel.x(), vel.y(), vel.z());
-  const speedKmh = speedMs * 3.6;
   const sharp = Math.abs(ang);
   const target = Math.max(40, 160 - sharp * 120) * v.aiSkill;
   let engine = 0, brake = 0;
@@ -252,10 +254,20 @@ function collectCarState(v, frameNum) {
   _toTrack.set(p.x - v.mesh.position.x, 0, p.z - v.mesh.position.z);
   const trackAngle = Math.atan2(_toTrack.x, _toTrack.z) - Math.atan2(_fwd.x, _fwd.z);
 
-  const aheadT = (v.progress + 0.05) % 1;
-  const ahead = trackCurve.getPointAt(aheadT);
-  const dx = ahead.x - p.x, dy = ahead.y - p.y, dz = ahead.z - p.z;
-  const curvature = Math.sqrt(dx * dx + dy * dy + dz * dz) / (trackLength * 0.05);
+  // Multi-distance lookahead curvature (10%, 20%, 30%, 50% ahead)
+  const ahead1T = (v.progress + 0.10) % 1;
+  const ahead2T = (v.progress + 0.20) % 1;
+  const ahead3T = (v.progress + 0.30) % 1;
+  const ahead4T = (v.progress + 0.50) % 1;
+  const p1 = trackCurve.getPointAt(ahead1T);
+  const p2 = trackCurve.getPointAt(ahead2T);
+  const p3 = trackCurve.getPointAt(ahead3T);
+  const p4 = trackCurve.getPointAt(ahead4T);
+  const seg = trackLength * 0.05;
+  const curv1 = p1.distanceTo(p) / seg;
+  const curv2 = p2.distanceTo(p1) / seg;
+  const curv3 = p3.distanceTo(p2) / seg;
+  const curv4 = p4.distanceTo(p3) / seg;
 
   _up.set(0, 1, 0).applyQuaternion(v.mesh.quaternion);
   const terrainSlope = _up.y - 1;
@@ -263,8 +275,8 @@ function collectCarState(v, frameNum) {
   // Compute distances to other cars in one pass
   const carDists = computeCarDistances(v);
 
-  return [speedKmh / 200, trackAngle / Math.PI, distToCenter, curvature, terrainSlope * 10,
-          carDists[0], carDists[1], carDists[2], 0, 0, 0, 0];
+  return [speedKmh / 200, trackAngle / Math.PI, distToCenter, curv1, curv2, curv3, curv4,
+          terrainSlope * 10, carDists[0], carDists[1], carDists[2], 0];
 }
 
 // Compute distances to nearest cars in a single pass (no repeated sorting)
