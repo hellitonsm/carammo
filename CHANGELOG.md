@@ -2,15 +2,22 @@
 
 ## [Unreleased]
 
+### Added
+- Rede neural DQN para IA dos veículos (neural-net.js, rl-agent.js)
+- Agente RL com replay buffer, epsilon-greedy, Double DQN
+- Treinamento em tempo real no browser com salvamento automático
+- Separação do main.js em 20 módulos ES (js/)
+
 ### Fixed
-- Ajusta posição Y de cactos, pedras e galpões para melhor alinhamento com o terreno
-- Reduz número de árvores de folha larga e as afasta da pista
-- Corrige comportamento de IA: steering mais responsivo e anti-wheelie
-- Reduz threshold de detecção de stuck para recuperação mais rápida
+- Corrige dunas invadindo a pista no cenário deserto (distância mínima verificada)
+- Corrige IA: carros não reiniciavam depois de sair da pista
+- Corrige stuck detection: timer aumentado para 2.5s, só reinicia se estava se movendo
+- Corrige Ammo.js timing: referências resolvidas no momento da chamada, não no parse
+- Corrige initNeuralAI: usa import estático em vez de import dinâmico
 
 ### Changed
-- Eleva seção da S-curva na floresta (overpass) para sensação de altura
-- Ajusta pontos do cenário floresta para melhorFlowLayout
+- main.js: de ~2188 linhas para ~206 linhas (entry point)
+- Estado compartilhado em js/state.js com setters
 
 ## [0.3.0] - 2026-07-15
 
