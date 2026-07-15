@@ -132,6 +132,38 @@ function bindMenu() {
   });
   document.getElementById('opt-ai').addEventListener('change', e => S.setAiEnabled(e.target.checked));
   document.getElementById('opt-nitro').addEventListener('change', e => S.setNitroEnabled(e.target.checked));
+  document.getElementById('opt-neural').addEventListener('change', e => S.setUseNeuralAI(e.target.checked));
+  // Reset AI weights button
+  document.getElementById('reset-ai-btn').addEventListener('click', () => {
+    try {
+      localStorage.removeItem('car-ai-agent');
+      const status = document.getElementById('ai-status');
+      status.textContent = '✓ Pesos apagados!';
+      status.className = 'ai-status-text cleared';
+      // If agent is already loaded, reinitialize
+      if (S.rlAgent) {
+        const agent = new RLAgent(12, [32, 24, 16], 2, {
+          learningRate: 0.003, gamma: 0.95, epsilon: 0.6, epsilonMin: 0.05,
+          epsilonDecay: 0.9997, batchSize: 32, bufferSize: 30000
+        });
+        S.setRlAgent(agent);
+      }
+      setTimeout(() => { status.textContent = ''; status.className = 'ai-status-text'; }, 3000);
+    } catch (e) {
+      console.warn('Reset failed:', e);
+    }
+  });
+  // Show AI status on load
+  const savedData = localStorage.getItem('car-ai-agent');
+  if (savedData) {
+    try {
+      const data = JSON.parse(savedData);
+      const status = document.getElementById('ai-status');
+      const kb = (savedData.length / 1024).toFixed(1);
+      status.textContent = `💾 ${data.trainSteps || 0} passos (${kb} KB)`;
+      status.className = 'ai-status-text has-data';
+    } catch (e) {}
+  }
   document.getElementById('start-btn').addEventListener('click', () => {
     document.getElementById('menu').hidden = true;
     document.getElementById('hud').hidden = false;

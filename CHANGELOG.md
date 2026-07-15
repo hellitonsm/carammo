@@ -3,21 +3,25 @@
 ## [Unreleased]
 
 ### Added
-- Rede neural DQN para IA dos veículos (neural-net.js, rl-agent.js)
-- Agente RL com replay buffer, epsilon-greedy, Double DQN
-- Treinamento em tempo real no browser com salvamento automático
-- Separação do main.js em 20 módulos ES (js/)
+- Toggle de IA Neural no menu (checkbox)
+- Botão de resetar pesos da IA com status (passos + tamanho)
+- Auto-save da IA ao fechar aba ou trocar de aba
+- Vetores Ammo pré-alocados (elimina GC pressure)
+- Cache de nearestOnCurve por frame
+- Vetores Three.js pré-alocados (_fwd, _up, _tan, etc.)
 
 ### Fixed
-- Corrige dunas invadindo a pista no cenário deserto (distância mínima verificada)
-- Corrige IA: carros não reiniciavam depois de sair da pista
-- Corrige stuck detection: timer aumentado para 2.5s, só reinicia se estava se movendo
-- Corrige Ammo.js timing: referências resolvidas no momento da chamada, não no parse
-- Corrige initNeuralAI: usa import estático em vez de import dinâmico
+- Corrige action format: `selectAction()` agora retorna `{steering, throttle}` em vez de array
+- Corrige carros parados: reward de velocidade aumentado (0.5/kmh), penalidade se < 3 km/h
+- Corrige reward de progresso: wrap-around para pistas circulares (progress > 0.5)
+- Corrige stuck detection: timer aumentado para 4s, simplificado para `speedMs < 2.0`
+- Corrige dunas invadindo a pista no deserto (distância mínima verificada)
 
 ### Changed
-- main.js: de ~2188 linhas para ~206 linhas (entry point)
-- Estado compartilhado em js/state.js com setters
+- Treinamento: frequência de 4→10 frames, save a cada 1000 frames
+- Hiperparâmetros: lr 0.001→0.003, gamma 0.99→0.95, epsilon 1.0→0.6, buffer 100K→30K
+- IA refatorada: separada em updateNeuralAI() e updateRuleBasedAI()
+- Reward reformulado: track alignment bonus, staying on track bonus, backward penalty
 
 ## [0.3.0] - 2026-07-15
 

@@ -23,17 +23,12 @@ class ReplayBuffer {
   }
   
   sample(batchSize) {
-    const batch = [];
-    const indices = new Set();
-    
-    while (indices.size < Math.min(batchSize, this.buffer.length)) {
-      indices.add(Math.floor(Math.random() * this.buffer.length));
+    const len = this.buffer.length;
+    const n = Math.min(batchSize, len);
+    const batch = new Array(n);
+    for (let i = 0; i < n; i++) {
+      batch[i] = this.buffer[(Math.random() * len) | 0];
     }
-    
-    for (const idx of indices) {
-      batch.push(this.buffer[idx]);
-    }
-    
     return batch;
   }
   
@@ -60,8 +55,8 @@ class RLAgent {
     this.epsilon = options.epsilon || 1.0;       // Exploration rate
     this.epsilonMin = options.epsilonMin || 0.01;
     this.epsilonDecay = options.epsilonDecay || 0.9995;
-    this.batchSize = options.batchSize || 64;
-    this.targetUpdateFreq = options.targetUpdateFreq || 1000;
+    this.batchSize = options.batchSize || 32;
+    this.targetUpdateFreq = options.targetUpdateFreq || 500;
     
     // Networks
     this.inputSize = inputSize;
@@ -89,9 +84,16 @@ class RLAgent {
   // Select action using epsilon-greedy policy
   selectAction(state, explore = true) {
     if (explore && Math.random() < this.epsilon) {
-      // Random action
+      // Biased random: favor throttle > 0 so the car actually moves
       const steeringIdx = Math.floor(Math.random() * this.steeringActions.length);
-      const throttleIdx = Math.floor(Math.random() * this.throttleActions.length);
+      // 70% chance of picking throttle >= 0.5, 30% chance of any value
+      let throttleIdx;
+      if (Math.random() < 0.7) {
+        // Pick from [0.5, 0.75, 1.0] (indices 2, 3, 4)
+        throttleIdx = 2 + Math.floor(Math.random() * 3);
+      } else {
+        throttleIdx = Math.floor(Math.random() * this.throttleActions.length);
+      }
       return {
         steering: this.steeringActions[steeringIdx],
         throttle: this.throttleActions[throttleIdx]
@@ -103,8 +105,9 @@ class RLAgent {
     
     // Discretize continuous outputs
     const steering = this.discretize(output[0], this.steeringActions);
-    const throttle = this.discretize(output[1], this.throttleActions);
-    
+    // Ensure minimum throttle when exploiting learned policy
+    let throttle = this.discretize(output[1], this.throttleActions);
+    if (throttle < 0.25) throttle = 0.25; // minimum forward drive
     return { steering, throttle };
   }
   
@@ -147,30 +150,34 @@ class RLAgent {
     let totalLoss = 0;
     
     for (const exp of batch) {
-      // Current Q-values
+      // Forward pass to get current prediction
       const currentOutput = this.qNetwork.predict(exp.state);
       
-      // Target Q-values
-      let target;
-      if (exp.done) {
-        target = exp.reward;
-      } else {
-        const nextOutput = this.targetNetwork.predict(exp.nextState);
-        const maxNextQ = Math.max(nextOutput[0], nextOutput[1]);
-        target = exp.reward + this.gamma * maxNextQ;
-      }
+      // Normalize reward to [-1, 1] range for stable training
+      const normalizedReward = Math.tanh(exp.reward * 0.001);
       
-      // Create target vector (only update the taken action's Q-value)
-      const targetVector = currentOutput.slice();
-      const steeringIdx = this.steeringActions.indexOf(exp.action.steering);
-      const throttleIdx = this.throttleActions.indexOf(exp.action.throttle);
+      // Target: reinforce the taken action weighted by how good the outcome was
+      // If reward > 0 → push outputs closer to the taken action
+      // If reward < 0 → push outputs away from the taken action
+      const takenSteering = exp.action.steering;  // [-1, 1]
+      const takenThrottle = exp.action.throttle;   // [0, 1]
       
-      // Update Q-value for the taken action
-      if (steeringIdx !== -1) {
-        targetVector[0] = target;
-      }
-      if (throttleIdx !== -1) {
-        targetVector[1] = target;
+      // Blend current prediction towards/away from taken action based on reward
+      const reinforceStrength = Math.min(1, Math.abs(normalizedReward)) * Math.sign(normalizedReward);
+      const alpha = 0.3; // how much to shift towards the "ideal" action
+      
+      const targetSteering = currentOutput[0] + alpha * reinforceStrength * (takenSteering - currentOutput[0]);
+      const targetThrottle = currentOutput[1] + alpha * reinforceStrength * (takenThrottle - currentOutput[1]);
+      
+      // Clamp targets to valid ranges
+      const targetVector = [
+        Math.max(-1, Math.min(1, targetSteering)),
+        Math.max(0, Math.min(1, targetThrottle))
+      ];
+      
+      // If done with negative outcome, push throttle down (learn to avoid that state)
+      if (exp.done && exp.reward < -50) {
+        targetVector[1] = Math.max(0, currentOutput[1] - 0.3);
       }
       
       // Train the network
@@ -208,46 +215,101 @@ class RLAgent {
     };
   }
   
-  // Save agent state
+  // Save agent state to localStorage
   save(name = 'car-ai-agent') {
-    const data = {
-      qNetwork: this.qNetwork.toJSON(),
-      epsilon: this.epsilon,
-      trainSteps: this.trainSteps,
-      episodeRewards: this.episodeRewards.slice(-1000),
-      losses: this.losses.slice(-1000),
-      hyperparams: {
-        learningRate: this.learningRate,
-        gamma: this.gamma,
-        epsilonMin: this.epsilonMin,
-        epsilonDecay: this.epsilonDecay,
-        batchSize: this.batchSize,
-        targetUpdateFreq: this.targetUpdateFreq
+    try {
+      const data = {
+        version: 2,
+        qNetwork: this.qNetwork.toJSON(),
+        epsilon: this.epsilon,
+        trainSteps: this.trainSteps,
+        episodeRewards: this.episodeRewards.slice(-500),
+        losses: this.losses.slice(-500),
+        avgReward: this.avgReward,
+        hyperparams: {
+          learningRate: this.learningRate,
+          gamma: this.gamma,
+          epsilonMin: this.epsilonMin,
+          epsilonDecay: this.epsilonDecay,
+          batchSize: this.batchSize,
+          targetUpdateFreq: this.targetUpdateFreq
+        },
+        savedAt: Date.now()
+      };
+      const json = JSON.stringify(data);
+      localStorage.setItem(name, json);
+      console.log(`[AI] Saved agent (${(json.length / 1024).toFixed(1)} KB, ε=${this.epsilon.toFixed(3)})`);
+      return json.length;
+    } catch (e) {
+      console.warn('[AI] Save failed:', e.message);
+      // If storage is full, try clearing old data
+      try {
+        localStorage.removeItem(name);
+        const data = {
+          version: 2,
+          qNetwork: this.qNetwork.toJSON(),
+          epsilon: this.epsilon,
+          trainSteps: this.trainSteps,
+          episodeRewards: [],
+          losses: [],
+          avgReward: this.avgReward,
+          hyperparams: {
+            learningRate: this.learningRate,
+            gamma: this.gamma,
+            epsilonMin: this.epsilonMin,
+            epsilonDecay: this.epsilonDecay,
+            batchSize: this.batchSize,
+            targetUpdateFreq: this.targetUpdateFreq
+          },
+          savedAt: Date.now()
+        };
+        const json = JSON.stringify(data);
+        localStorage.setItem(name, json);
+        return json.length;
+      } catch (e2) {
+        console.error('[AI] Save failed even after cleanup:', e2.message);
+        return 0;
       }
-    };
-    localStorage.setItem(name, JSON.stringify(data));
-    return JSON.stringify(data).length;
+    }
   }
   
-  // Load agent state
+  // Load agent state from localStorage
   static load(name = 'car-ai-agent') {
-    const raw = localStorage.getItem(name);
-    if (!raw) return null;
-    
-    const data = JSON.parse(raw);
-    const agent = new RLAgent(data.qNetwork.inputSize, data.qNetwork.hiddenSizes, data.qNetwork.outputSize);
-    agent.qNetwork = NeuralNetwork.fromJSON(data.qNetwork);
-    agent.targetNetwork = agent.qNetwork.clone();
-    agent.epsilon = data.epsilon;
-    agent.trainSteps = data.trainSteps;
-    agent.episodeRewards = data.episodeRewards || [];
-    agent.losses = data.losses || [];
-    
-    if (data.hyperparams) {
-      Object.assign(agent, data.hyperparams);
+    try {
+      const raw = localStorage.getItem(name);
+      if (!raw) return null;
+      
+      const data = JSON.parse(raw);
+      
+      // Validate data structure
+      if (!data.qNetwork || !data.qNetwork.weights) {
+        console.warn('[AI] Invalid saved data, starting fresh');
+        return null;
+      }
+      
+      const agent = new RLAgent(
+        data.qNetwork.inputSize,
+        data.qNetwork.hiddenSizes,
+        data.qNetwork.outputSize
+      );
+      agent.qNetwork = NeuralNetwork.fromJSON(data.qNetwork);
+      agent.targetNetwork = agent.qNetwork.clone();
+      agent.epsilon = data.epsilon != null ? data.epsilon : 0.5;
+      agent.trainSteps = data.trainSteps || 0;
+      agent.episodeRewards = data.episodeRewards || [];
+      agent.losses = data.losses || [];
+      agent.avgReward = data.avgReward || 0;
+      
+      if (data.hyperparams) {
+        Object.assign(agent, data.hyperparams);
+      }
+      
+      console.log(`[AI] Loaded agent v${data.version || 1}, ${agent.trainSteps} training steps`);
+      return agent;
+    } catch (e) {
+      console.warn('[AI] Load failed:', e.message);
+      return null;
     }
-    
-    return agent;
   }
   
   // Reset episode reward tracking

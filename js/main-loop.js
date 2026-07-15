@@ -8,7 +8,7 @@ import { scene, renderer, camera, clock, sun, vehicles, playerVehicle, physicsWo
          setFrameProgress } from './state.js';
 import { syncVehicle, updateCamera } from './sync-camera.js';
 import { updatePlayerVehicle, resetVehicle } from './player-control.js';
-import { updateAI } from './ai.js';
+import { updateAI, beginAIFrame } from './ai.js';
 import { checkLaps, updateProgress } from './lap-race.js';
 import { updateHUD, updateMinimap } from './hud.js';
 import { updateCountdown } from './countdown.js';
@@ -20,6 +20,7 @@ export function animate() {
   const dt = Math.min(clock.getDelta(), 1 / 30);
   updateCountdown(dt);
   updatePlayerVehicle(dt);
+  beginAIFrame();
   updateAI(dt);
   physicsWorld.stepSimulation(dt, 4, 1 / 120);
   for (const v of vehicles) {
