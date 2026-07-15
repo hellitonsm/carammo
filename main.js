@@ -50,6 +50,109 @@ let speedLines = null;
 // Wheel dust/snow/sand spray particles per vehicle
 const worldParticles = []; // {geo, mat, data, index, sceneObj, count}
 
+// ======================= NEURAL NETWORK AI =======================
+let rlAgent = null;
+let useNeuralAI = true;
+let frameCount = 0;
+let lastProgress = {};
+
+function initNeuralAI() {
+  try {
+    rlAgent = RLAgent.load('car-ai-agent');
+    if (!rlAgent) {
+      rlAgent = new RLAgent(12, [32, 24, 16], 2, {
+        learningRate: 0.001,
+        gamma: 0.99,
+        epsilon: 1.0,
+        epsilonMin: 0.01,
+        epsilonDecay: 0.9995,
+        batchSize: 64,
+        bufferSize: 100000
+      });
+    }
+    console.log('Neural AI initialized. Parameters:', rlAgent.qNetwork.getParamCount());
+  } catch (e) {
+    console.warn('Failed to initialize neural AI:', e);
+    useNeuralAI = false;
+  }
+}
+
+function collectCarState(v) {
+  const vel = v.body.getLinearVelocity();
+  const speedMs = Math.hypot(vel.x(), vel.y(), vel.z());
+  const speedKmh = speedMs * 3.6;
+  
+  const nr = nearestOnCurve(trackCurve, v.mesh.position);
+  const distToCenter = nr.dist / (trackWidth / 2);
+  
+  const p = trackCurve.getPointAt(v.progress);
+  const tan = trackCurve.getTangentAt(v.progress);
+  const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(v.mesh.quaternion);
+  const toTrack = new THREE.Vector3().subVectors(p, v.mesh.position);
+  toTrack.y = 0;
+  const trackAngle = Math.atan2(toTrack.x, toTrack.z) - Math.atan2(fwd.x, fwd.z);
+  
+  const aheadT = (v.progress + 0.05) % 1;
+  const ahead = trackCurve.getPointAt(aheadT);
+  const curvature = ahead.distanceTo(p) / (trackLength * 0.05);
+  
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(v.mesh.quaternion);
+  const terrainSlope = up.y - 1;
+  
+  const car1Dist = getDistanceToNearestCar(v, 0);
+  const car2Dist = getDistanceToNearestCar(v, 1);
+  const car3Dist = getDistanceToNearestCar(v, 2);
+  
+  const wheelStates = v.vehicle.getNumWheels ? [0, 0, 0, 0] : [0, 0, 0, 0];
+  
+  return [
+    speedKmh / 200,
+    trackAngle / Math.PI,
+    distToCenter,
+    curvature,
+    terrainSlope * 10,
+    car1Dist,
+    car2Dist,
+    car3Dist,
+    wheelStates[0],
+    wheelStates[1],
+    wheelStates[2],
+    wheelStates[3]
+  ];
+}
+
+function getDistanceToNearestCar(v, index) {
+  let distances = [];
+  for (const other of vehicles) {
+    if (other === v) continue;
+    const dist = v.mesh.position.distanceTo(other.mesh.position);
+    distances.push(dist);
+  }
+  distances.sort((a, b) => a - b);
+  return distances[index] ? distances[index] / 100 : 1;
+}
+
+function calculateReward(v, prevProgress) {
+  const progressGain = v.progress - prevProgress;
+  let reward = progressGain * 100;
+  
+  if (v.lap > (v.lastLap || 0)) {
+    reward += 500;
+    v.lastLap = v.lap;
+  }
+  
+  const vel = v.body.getLinearVelocity();
+  const speedMs = Math.hypot(vel.x(), vel.y(), vel.z());
+  reward += speedMs * 0.1;
+  
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(v.mesh.quaternion);
+  if (up.y < 0.5) reward -= 50;
+  
+  if (progressGain < -0.01) reward -= 10;
+  
+  return reward;
+}
+
 // ======================= INIT =======================
 function initThree() {
   renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -1512,6 +1615,65 @@ function updateAI(dt){
   if (!aiEnabled) return;
   for (const v of vehicles){
     if (v.isPlayer||v.finished) continue;
+    
+    if (useNeuralAI && rlAgent && raceState==='racing' && controlsEnabled && !paused) {
+      if (!v.aiState.prevProgress) v.aiState.prevProgress = v.progress;
+      const state = collectCarState(v);
+      const action = rlAgent.selectAction(state);
+      const steerVal = (action[0] * 2 - 1) * CFG.maxSteer;
+      const throttle = action[1];
+      
+      v.vehicle.setSteeringValue(steerVal, 0);
+      v.vehicle.setSteeringValue(steerVal, 1);
+      
+      const engine = CFG.engineForce * throttle;
+      const brake = throttle < 0.1 ? CFG.brakingForce * 0.4 : 0;
+      v.vehicle.applyEngineForce(engine, 2);
+      v.vehicle.applyEngineForce(engine, 3);
+      v.vehicle.setBrake(brake, 0);
+      v.vehicle.setBrake(brake, 1);
+      v.vehicle.setBrake(brake * 0.3, 2);
+      v.vehicle.setBrake(brake * 0.3, 3);
+      
+      v.aiState.accel = throttle;
+      v.aiState.steer = steerVal;
+      
+      const reward = calculateReward(v, v.aiState.prevProgress);
+      const newState = collectCarState(v);
+      const done = v.finished || v.mesh.position.y < -10;
+      rlAgent.remember(state, action, reward, newState, done);
+      v.aiState.prevProgress = v.progress;
+      
+      frameCount++;
+      if (frameCount % 4 === 0) rlAgent.train();
+      if (frameCount % 3000 === 0) {
+        rlAgent.save('car-ai-agent');
+      }
+      
+      const lv = getLocalVelocity(v);
+      const vel = v.body.getLinearVelocity();
+      const speedMs = Math.hypot(vel.x(), vel.y(), vel.z());
+      if (speedMs > 1) {
+        const df = speedMs * speedMs * 8;
+        const f = new Ammo.btVector3(0, -df, 0);
+        v.body.applyCentralForce(f);
+        Ammo.destroy(f);
+      }
+      const chassisUp = new THREE.Vector3(0, 1, 0).applyQuaternion(v.mesh.quaternion);
+      if (chassisUp.y > 0.88) {
+        const anti = new Ammo.btVector3(0, -220, 0);
+        v.body.applyCentralForce(anti);
+        Ammo.destroy(anti);
+      }
+      emitExhaustFx(v, speedMs * 3.6, Math.abs(lv.x) > 3);
+      if (Math.abs(lv.x) > 3 || v.aiState.accel > 0.7) emitWheelDust(v, speedMs * 3.6, Math.abs(lv.x) > 3);
+      v.aiState.stuckTimer = (v.aiState.stuckTimer || 0) + dt;
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(v.mesh.quaternion);
+      if (up.y < 0.3 || v.mesh.position.y < -10) { resetVehicle(v, false); v.aiState.stuckTimer = 0; }
+      else if (v.aiState.stuckTimer > 1.8 && Math.hypot(lv.x, lv.z) < 2.0) { resetVehicle(v, false); v.aiState.stuckTimer = 0; }
+      continue;
+    }
+    
     if (paused||!controlsEnabled||raceState!=='racing'){applyBrakes(v,CFG.brakingForce*0.4); v.aiState.accel=0; continue;}
     const ai=v.aiState;
     ai.errorTimer-=dt;
@@ -1738,6 +1900,7 @@ function checkVehicleLap(v){
 }
 function finishRace(){
   raceState='finished'; controlsEnabled=false; totalRaceMs=raceAccumMs;
+  if (rlAgent) rlAgent.save('car-ai-agent');
   playerVehicle.finished=true; playerVehicle.finishTime=totalRaceMs;
   const sorted=standings();
   const el=document.getElementById('race-results'); let html='';
@@ -1781,6 +1944,11 @@ function updateHUD(){
   document.getElementById('best-time').textContent=bestLapMs!=null?`Melhor ${formatTime(bestLapMs)}`:'Melhor —';
   const st=standings(); const p=st.indexOf(playerVehicle)+1;
   document.getElementById('position-info').textContent=`Posição: ${p}/${vehicles.length}`;
+  if (rlAgent && useNeuralAI) {
+    const stats = rlAgent.getStats();
+    const hudEl = document.getElementById('position-info');
+    if (hudEl) hudEl.textContent += ` | ε:${stats.epsilon.toFixed(2)} buf:${stats.bufferSize}`;
+  }
   document.getElementById('pause-overlay') && (document.getElementById('pause-overlay').hidden = !paused);
 }
 function updateNitroBar(){
@@ -2005,7 +2173,7 @@ async function main(){
   const err=await waitForAmmo();
   if (err instanceof Error) throw err;
   await window.Ammo(); Ammo=window.Ammo;
-  initThree(); initPhysics(); initInput();
+  initThree(); initPhysics(); initInput(); initNeuralAI();
   ammoLoaded=true;
   document.querySelector('.scene-option[data-scene="forest"]').classList.add('selected');
   document.querySelector('.car-option[data-color="0xd62828"]').classList.add('selected');

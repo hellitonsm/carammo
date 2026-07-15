@@ -70,10 +70,10 @@ O jogo precisa de um servidor HTTP local (para carregar módulos ES):
 
 ```bash
 cd carammo
-python3 -m http.server 8000
+python3 -m http.server 2626
 ```
 
-Acesse `http://localhost:8000` no navegador.
+Acesse `http://localhost:2626` no navegador.
 
 ## 🛠️ Tecnologias
 
