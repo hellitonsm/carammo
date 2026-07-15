@@ -602,7 +602,7 @@ function addFrozenLakes(curve, bound) {
     if (nr.dist < 40) continue;
     const lake = new THREE.Mesh(new THREE.CircleGeometry(15 + Math.random() * 20, 24), lakeMat);
     lake.rotation.x = -Math.PI / 2;
-    lake.position.set(x, -0.8, z); lake.receiveShadow = true; scene.add(lake);
+    lake.position.set(x, 0.02, z); lake.receiveShadow = true; scene.add(lake);
   }
 }
 

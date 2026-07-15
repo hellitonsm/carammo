@@ -17,7 +17,7 @@ export function initPhysics() {
   // Ground collision body — cars that fall off the track land here instead of void
   const groundShape = new Ammo.btBoxShape(new Ammo.btVector3(500, 0.5, 500));
   const groundTransform = new Ammo.btTransform(); groundTransform.setIdentity();
-  groundTransform.setOrigin(new Ammo.btVector3(0, -2, 0));
+  groundTransform.setOrigin(new Ammo.btVector3(0, -0.5, 0));
   const groundBody = new Ammo.btRigidBody(new Ammo.btRigidBodyConstructionInfo(
     0, new Ammo.btDefaultMotionState(groundTransform), groundShape, new Ammo.btVector3(0, 0, 0)));
   groundBody.setFriction(CFG.groundFriction);

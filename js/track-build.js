@@ -40,7 +40,7 @@ export function buildTrack(scn) {
     new THREE.MeshStandardMaterial({ map: makeGroundTexture(scn.groundTex), color: scn.groundColor, roughness: scn.groundRoughness ?? 0.95 })
   );
   ground.rotation.x = -Math.PI / 2;
-  ground.position.set(bound.cx, -1.5, bound.cz);
+  ground.position.set(bound.cx, 0, bound.cz);
   ground.receiveShadow = true;
   scene.add(ground);
 
