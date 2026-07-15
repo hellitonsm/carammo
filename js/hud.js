@@ -1,80 +1,182 @@
-// ============================================================================
-//  HUD — heads-up display updates (speed, lap, position, minimap, nitro)
-// ============================================================================
-
-import * as THREE from 'three';
+import {
+  getPlayerVehicle,
+  getVehicles,
+  getLap,
+  getBestLapMs,
+  getLapStartTime,
+  getRaceState,
+  getPaused,
+  getNitro,
+  getNitroActive,
+  getNitroEnabled,
+  getMinimapPath,
+  getMinimapBounds,
+  getUseNeuralAI,
+  getRlAgent,
+  getTrackCurve,
+} from './state.js';
 import { CFG } from './config.js';
-import { raceState, playerVehicle, vehicles, lap, lapStartTime, bestLapMs,
-         minimapPath, minimapBounds, paused, nitroEnabled, nitro, nitroActive,
-         rlAgent, useNeuralAI, setMinimapBounds } from './state.js';
-import { standings, formatTime } from './lap-race.js';
+import { formatTime, standings } from './lap-race.js';
 
 export function updateHUD() {
-  if (raceState === 'menu') return;
-  const v = playerVehicle;
-  const vel = v.body.getLinearVelocity();
-  const skm = Math.round(Math.hypot(vel.x(), vel.y(), vel.z()) * 3.6);
-  document.getElementById('speed').innerHTML = `${skm}<span>km/h</span>`;
-  document.getElementById('lap').textContent = `Volta ${Math.min(lap + 1, CFG.raceLaps)} / ${CFG.raceLaps}`;
-  if (raceState === 'racing') document.getElementById('lap-time').textContent = formatTime(performance.now() - lapStartTime);
-  document.getElementById('best-time').textContent = bestLapMs != null ? `Melhor ${formatTime(bestLapMs)}` : 'Melhor \u2014';
-  const st = standings();
-  const p = st.indexOf(playerVehicle) + 1;
-  document.getElementById('position-info').textContent = `Posi\u00e7\u00e3o: ${p}/${vehicles.length}`;
-  if (rlAgent && useNeuralAI) {
-    const stats = rlAgent.getStats();
-    const hudEl = document.getElementById('position-info');
-    if (hudEl) hudEl.textContent += ` | \u03b5:${stats.epsilon.toFixed(2)} buf:${stats.bufferSize}`;
+  const player = getPlayerVehicle();
+  if (!player) return;
+
+  const lv = player.body.getLinearVelocity();
+  const speedKmh = Math.hypot(lv.x(), lv.y(), lv.z()) * 3.6;
+
+  const speedEl = document.getElementById('speed');
+  if (speedEl) {
+    speedEl.innerHTML = `${Math.round(speedKmh)}<span>km/h</span>`;
   }
-  document.getElementById('pause-overlay') && (document.getElementById('pause-overlay').hidden = !paused);
+
+  const lapEl = document.getElementById('lap');
+  if (lapEl) {
+    const lap = getLap();
+    lapEl.textContent = `Volta ${Math.min(lap, 3)} / 3`;
+  }
+
+  const lapTimeEl = document.getElementById('lap-time');
+  if (lapTimeEl && getRaceState() === 'racing') {
+    const elapsed = performance.now() - getLapStartTime();
+    lapTimeEl.textContent = formatTime(elapsed);
+  }
+
+  const bestEl = document.getElementById('best-time');
+  if (bestEl) {
+    const best = getBestLapMs();
+    bestEl.textContent = best !== null ? formatTime(best) : '--:--.---';
+  }
+
+  const posEl = document.getElementById('position-info');
+  if (posEl) {
+    const ranks = standings();
+    const idx = ranks.findIndex((v) => v.isPlayer);
+    let text = `Posição: ${idx + 1}/${ranks.length}`;
+    if (getUseNeuralAI()) {
+      const agent = getRlAgent();
+      if (agent) {
+        text += ` | ε:${agent.epsilon.toFixed(2)} buf:${agent.bufferSize}`;
+      }
+    }
+    posEl.textContent = text;
+  }
+
+  const pauseOverlay = document.getElementById('pause-overlay');
+  if (pauseOverlay) {
+    pauseOverlay.hidden = !getPaused();
+  }
 }
 
 export function updateNitroBar() {
+  const wrap = document.getElementById('nitro-bar-wrap');
   const bar = document.getElementById('nitro-bar');
-  if (!nitroEnabled) { bar.style.width = '0%'; bar.parentElement.style.display = 'none'; return; }
-  bar.parentElement.style.display = '';
-  bar.style.width = `${nitro}%`;
-  bar.classList.toggle('active', nitroActive);
+  if (!wrap || !bar) return;
+
+  if (!getNitroEnabled()) {
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  const pct = getNitro();
+  bar.style.width = `${pct}%`;
+  if (getNitroActive()) bar.classList.add('active');
+  else bar.classList.remove('active');
 }
 
+let _miniReady = false;
+let _miniScale = 1;
+let _miniOx = 0;
+let _miniOz = 0;
+
 export function updateMinimap() {
-  if (!minimapPath || !playerVehicle) return;
-  const cv = document.getElementById('minimap'), ctx = cv.getContext('2d');
-  const w = cv.width, h = cv.height, pad = 18;
-  if (!minimapBounds) {
-    const mnx = Math.min(...minimapPath.map(p => p.x));
-    const mxx = Math.max(...minimapPath.map(p => p.x));
-    const mnz = Math.min(...minimapPath.map(p => p.z));
-    const mxz = Math.max(...minimapPath.map(p => p.z));
-    const sc = Math.min((w - pad * 2) / (mxx - mnx || 1), (h - pad * 2) / (mxz - mnz || 1));
-    setMinimapBounds({ minX: mnx, minZ: mnz, scale: sc, offsetX: (w - (mxx - mnx) * sc) / 2, offsetZ: (h - (mxz - mnz) * sc) / 2 });
+  const canvas = document.getElementById('minimap');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+
+  const path = getMinimapPath();
+  const bounds = getMinimapBounds();
+  if (!path || !bounds) return;
+
+  if (!_miniReady) {
+    const scaleX = (w - 20) / bounds.sizeX;
+    const scaleZ = (h - 20) / bounds.sizeZ;
+    _miniScale = Math.min(scaleX, scaleZ);
+    _miniOx = w / 2 - bounds.cx * _miniScale;
+    _miniOz = h / 2 - bounds.cz * _miniScale;
+    _miniReady = true;
   }
-  const b = minimapBounds;
-  ctx.fillStyle = 'rgba(6,12,9,0.88)'; ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2.5; ctx.beginPath();
-  minimapPath.forEach((p, i) => {
-    const x = (p.x - b.minX) * b.scale + b.offsetX, y = (p.z - b.minZ) * b.scale + b.offsetZ;
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  });
-  ctx.closePath(); ctx.stroke();
-  ctx.strokeStyle = 'rgba(232,93,4,0.5)'; ctx.lineWidth = 6; ctx.beginPath();
-  let started = false;
-  minimapPath.forEach((p, i) => {
-    if (i / (minimapPath.length - 1) > playerVehicle.progress) return;
-    const x = (p.x - b.minX) * b.scale + b.offsetX, y = (p.z - b.minZ) * b.scale + b.offsetZ;
-    if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
-  });
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, w, h);
+
+  // Track path
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < path.length; i++) {
+    const x = path[i].x * _miniScale + _miniOx;
+    const z = path[i].z * _miniScale + _miniOz;
+    if (i === 0) ctx.moveTo(x, z);
+    else ctx.lineTo(x, z);
+  }
+  ctx.closePath();
   ctx.stroke();
+
+  // Player progress arc (orange)
+  const player = getPlayerVehicle();
+  if (player && path.length > 1) {
+    const n = Math.floor(player.progress * (path.length - 1));
+    ctx.strokeStyle = 'rgba(255,140,0,0.8)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const x = path[i].x * _miniScale + _miniOx;
+      const z = path[i].z * _miniScale + _miniOz;
+      if (i === 0) ctx.moveTo(x, z);
+      else ctx.lineTo(x, z);
+    }
+    ctx.stroke();
+  }
+
+  // Vehicles
+  const vehicles = getVehicles();
   for (const v of vehicles) {
-    const x = (v.mesh.position.x - b.minX) * b.scale + b.offsetX;
-    const y = (v.mesh.position.z - b.minZ) * b.scale + b.offsetZ;
-    ctx.fillStyle = v.isPlayer ? '#e85d04' : '#' + new THREE.Color(v.color).getHexString();
-    ctx.beginPath(); ctx.arc(x, y, v.isPlayer ? 5 : 4, 0, Math.PI * 2); ctx.fill();
+    if (!v.mesh) continue;
+    const x = v.mesh.position.x * _miniScale + _miniOx;
+    const z = v.mesh.position.z * _miniScale + _miniOz;
+    const r = v.isPlayer ? 5 : 4;
+    const col = v.isPlayer
+      ? '#ff8c00'
+      : '#' + (v.color >>> 0).toString(16).padStart(6, '0');
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(x, z, r, 0, Math.PI * 2);
+    ctx.fill();
+
     if (v.isPlayer) {
-      const d = new THREE.Vector3(0, 0, 1).applyQuaternion(v.mesh.quaternion);
-      const a = Math.atan2(d.x, d.z);
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath();
-      ctx.moveTo(x, y); ctx.lineTo(x + Math.sin(a) * 10, y + Math.cos(a) * 10); ctx.stroke();
+      // direction arrow
+      const e = new THREE_Euler_Y(v.mesh.quaternion);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, z);
+      ctx.lineTo(x + Math.sin(e) * 8, z + Math.cos(e) * 8);
+      ctx.stroke();
     }
   }
+}
+
+function THREE_Euler_Y(quat) {
+  // extract yaw from quaternion
+  const siny = 2 * (quat.w * quat.y + quat.x * quat.z);
+  const cosy = 1 - 2 * (quat.y * quat.y + quat.x * quat.x);
+  return Math.atan2(siny, cosy);
+}
+
+export function resetMinimap() {
+  _miniReady = false;
 }

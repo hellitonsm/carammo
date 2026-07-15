@@ -1,66 +1,92 @@
-// ============================================================================
-//  Main loop — requestAnimationFrame driver, physics step, render
-// ============================================================================
-
-import * as THREE from 'three';
-import { scene, renderer, camera, clock, sun, vehicles, playerVehicle, physicsWorld,
-         raceState, paused, snowParticles, exhaustSys, dustSys, nitroFlameSys,
-         setFrameProgress } from './state.js';
-import { syncVehicle, updateCamera } from './sync-camera.js';
-import { updatePlayerVehicle, resetVehicle } from './player-control.js';
-import { updateAI, beginAIFrame } from './ai.js';
-import { checkLaps, updateProgress } from './lap-race.js';
-import { updateHUD, updateMinimap } from './hud.js';
+import {
+  getClock,
+  getRenderer,
+  getScene,
+  getCamera,
+  getPhysicsWorld,
+  getVehicles,
+  getPlayerVehicle,
+  getRaceState,
+  getPaused,
+  setFrameProgress,
+  getExhaustSys,
+  getDustSys,
+  getNitroFlameSys,
+  getSnowParticles,
+  getSun,
+} from './state.js';
 import { updateCountdown } from './countdown.js';
-import { updateSkids, spawnSkid } from './skid-marks.js';
+import { updatePlayerVehicle } from './player-control.js';
+import { beginAIFrame, updateAI } from './ai.js';
+import { syncVehicle, updateCamera } from './sync-camera.js';
+import { updateProgress, checkLaps } from './lap-race.js';
+import { updateHUD, updateMinimap } from './hud.js';
+import { updateSkids } from './skid-marks.js';
 import { updateWorldParticles } from './particles.js';
+import { updateSnow } from './track-environment.js';
+import { resetVehicle } from './car.js';
+
+let _running = false;
 
 export function animate() {
+  _running = true;
   requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 1 / 30);
+
+  const clock = getClock();
+  const renderer = getRenderer();
+  const scene = getScene();
+  const camera = getCamera();
+  if (!clock || !renderer || !scene || !camera) return;
+
+  let dt = clock.getDelta();
+  dt = Math.min(dt, 1 / 30); // clamp anti-spike
+
   updateCountdown(dt);
   updatePlayerVehicle(dt);
   beginAIFrame();
   updateAI(dt);
-  physicsWorld.stepSimulation(dt, 4, 1 / 120);
+
+  const physicsWorld = getPhysicsWorld();
+  if (physicsWorld) {
+    physicsWorld.stepSimulation(dt, 4, 1 / 120);
+  }
+
+  const vehicles = getVehicles();
+  const raceState = getRaceState();
+  const paused = getPaused();
+
   for (const v of vehicles) {
-    v.vehicle.updateVehicle(dt);
+    if (v.vehicle) v.vehicle.updateVehicle(dt);
     syncVehicle(v);
     updateProgress(v);
-    if (v.mesh.position.y < -20 && raceState === 'racing' && !paused) resetVehicle(v, false);
+    if (
+      v.mesh &&
+      v.mesh.position.y < -20 &&
+      raceState === 'racing' &&
+      !paused
+    ) {
+      resetVehicle(v, false);
+    }
   }
-  setFrameProgress(playerVehicle.progress);
+
+  const player = getPlayerVehicle();
+  if (player) setFrameProgress(player.progress);
+
   checkLaps();
   updateCamera(dt);
   updateHUD();
   updateMinimap();
   updateSkids(dt);
-  if (exhaustSys) updateWorldParticles(exhaustSys, dt, 1.5);
-  if (dustSys) updateWorldParticles(dustSys, dt, -2);
-  if (nitroFlameSys) updateWorldParticles(nitroFlameSys, dt, -1);
-  updateSnow(dt);
-  if (sun && playerVehicle) {
-    const tx = playerVehicle.mesh.position.x, tz = playerVehicle.mesh.position.z;
-    sun.target.position.set(tx, 0, tz);
-    sun.position.set(tx + 80, playerVehicle.mesh.position.y + 110, tz + 50);
-    sun.target.updateMatrixWorld();
-  }
+
+  updateWorldParticles(getExhaustSys(), dt, 1.5);
+  updateWorldParticles(getDustSys(), dt, -2);
+  updateWorldParticles(getNitroFlameSys(), dt, -1);
+
+  if (getSnowParticles()) updateSnow(dt);
+
   renderer.render(scene, camera);
 }
 
-function updateSnow(dt) {
-  if (!snowParticles) return;
-  const pos = snowParticles.geometry.attributes.position.array;
-  const vel = snowParticles.userData.vel;
-  const cx = playerVehicle.mesh.position.x, cz = playerVehicle.mesh.position.z;
-  for (let i = 0; i < pos.length / 3; i++) {
-    pos[i * 3 + 1] -= vel[i] * 60 * dt;
-    pos[i * 3] += Math.sin(performance.now() * 0.001 + i) * 0.02;
-    if (pos[i * 3 + 1] < -2) {
-      pos[i * 3] = cx + (Math.random() - 0.5) * 200;
-      pos[i * 3 + 1] = 40 + Math.random() * 20;
-      pos[i * 3 + 2] = cz + (Math.random() - 0.5) * 200;
-    }
-  }
-  snowParticles.geometry.attributes.position.needsUpdate = true;
+export function isAnimating() {
+  return _running;
 }

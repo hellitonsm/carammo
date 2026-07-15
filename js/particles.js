@@ -1,79 +1,149 @@
-// ============================================================================
-//  Particles — generic world-space particle system + emit/update helpers
-// ============================================================================
-
 import * as THREE from 'three';
-import { scene, exhaustSys, dustSys, nitroFlameSys,
-         setExhaustSys, setDustSys, setNitroFlameSys,
-         currentSceneDef } from './state.js';
-export { exhaustSys, dustSys, nitroFlameSys };
+import {
+  getScene,
+  setExhaustSys,
+  setDustSys,
+  setNitroFlameSys,
+  getExhaustSys,
+  getDustSys,
+  getNitroFlameSys,
+  getCurrentSceneDef,
+} from './state.js';
 
 export function createWorldPointSystem(count, color, size, maxLife) {
-  const geo = new THREE.BufferGeometry();
-  const pos = new Float32Array(count * 3);
-  const col = new Float32Array(count * 3);
+  const scene = getScene();
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
   const sizes = new Float32Array(count);
+  const data = [];
+
   const c = new THREE.Color(color);
   for (let i = 0; i < count; i++) {
-    pos[i*3] = 0; pos[i*3+1] = -999; pos[i*3+2] = 0;
-    col[i*3] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b;
-    sizes[i] = 0;
+    positions[i * 3] = 0;
+    positions[i * 3 + 1] = -999;
+    positions[i * 3 + 2] = 0;
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+    sizes[i] = size;
+    data.push({ life: 0, maxLife, vx: 0, vy: 0, vz: 0, size });
   }
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const mat = new THREE.PointsMaterial({ size, transparent: true, opacity: 0.6, depthWrite: false, vertexColors: true, sizeAttenuation: true });
-  const pts = new THREE.Points(geo, mat);
-  scene.add(pts);
-  const data = new Array(count).fill(null).map(() => ({ life:1, maxLife:1, vx:0, vy:0, vz:0, size:0 }));
-  return { mesh: pts, geo, mat, pos, col, data, index: 0, count, maxLife };
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+  const mat = new THREE.PointsMaterial({
+    size,
+    vertexColors: true,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0.7,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+
+  const points = new THREE.Points(geo, mat);
+  points.frustumCulled = false;
+  scene.add(points);
+
+  return {
+    points,
+    data,
+    count,
+    idx: 0,
+    maxLife,
+    baseSize: size,
+    baseColor: c,
+  };
 }
 
-export function emitParticle(sys, wx, wy, wz, vx, vy, vz, size, color) {
-  const i = sys.index;
-  sys.index = (sys.index + 1) % sys.count;
-  const p = sys.data[i];
-  p.life = 0;
-  p.maxLife = sys.maxLife * (0.7 + Math.random() * 0.6);
-  p.vx = vx; p.vy = vy; p.vz = vz; p.size = size;
-  sys.pos[i*3] = wx; sys.pos[i*3+1] = wy; sys.pos[i*3+2] = wz;
+export function emitParticle(sys, x, y, z, vx, vy, vz, size, color) {
+  if (!sys) return;
+  const i = sys.idx;
+  sys.idx = (sys.idx + 1) % sys.count;
+  const d = sys.data[i];
+  d.life = d.maxLife || sys.maxLife;
+  d.maxLife = d.maxLife || sys.maxLife;
+  d.vx = vx;
+  d.vy = vy;
+  d.vz = vz;
+  d.size = size || sys.baseSize;
+
+  const pos = sys.points.geometry.attributes.position.array;
+  pos[i * 3] = x;
+  pos[i * 3 + 1] = y;
+  pos[i * 3 + 2] = z;
+
+  const cols = sys.points.geometry.attributes.color.array;
   if (color) {
     const c = new THREE.Color(color);
-    sys.col[i*3] = c.r; sys.col[i*3+1] = c.g; sys.col[i*3+2] = c.b;
+    cols[i * 3] = c.r;
+    cols[i * 3 + 1] = c.g;
+    cols[i * 3 + 2] = c.b;
   }
+  sys.points.geometry.attributes.position.needsUpdate = true;
+  sys.points.geometry.attributes.color.needsUpdate = true;
 }
 
 export function updateWorldParticles(sys, dt, gravity) {
-  const { pos, data } = sys;
+  if (!sys) return;
+  const pos = sys.points.geometry.attributes.position.array;
+  const cols = sys.points.geometry.attributes.color.array;
+  let needsUpdate = false;
+
   for (let i = 0; i < sys.count; i++) {
-    const p = data[i];
-    if (p.life >= p.maxLife) { pos[i*3+1] = -999; continue; }
-    p.life += dt;
-    pos[i*3] += p.vx * dt;
-    pos[i*3+1] += p.vy * dt;
-    pos[i*3+2] += p.vz * dt;
-    p.vy += gravity * dt;
-    p.vx *= 0.96; p.vz *= 0.96;
+    const d = sys.data[i];
+    if (d.life <= 0) continue;
+    d.life -= dt;
+    if (d.life <= 0) {
+      pos[i * 3 + 1] = -999;
+      needsUpdate = true;
+      continue;
+    }
+    pos[i * 3] += d.vx * dt;
+    pos[i * 3 + 1] += d.vy * dt;
+    pos[i * 3 + 2] += d.vz * dt;
+    d.vy += gravity * dt;
+    d.vx *= 0.96;
+    d.vz *= 0.96;
+
+    // fade
+    const fade = d.life / d.maxLife;
+    cols[i * 3] *= 0.99;
+    cols[i * 3 + 1] *= 0.99;
+    cols[i * 3 + 2] *= 0.99;
+    needsUpdate = true;
   }
-  sys.geo.attributes.position.needsUpdate = true;
-  sys.mat.opacity = 0.55;
+  if (needsUpdate) {
+    sys.points.geometry.attributes.position.needsUpdate = true;
+    sys.points.geometry.attributes.color.needsUpdate = true;
+  }
 }
 
 export function createExhaust() {
-  if (!exhaustSys) setExhaustSys(createWorldPointSystem(200, 0xeeeeee, 0.35, 0.8));
-  return exhaustSys;
+  const sys = createWorldPointSystem(200, 0x888888, 0.35, 0.8);
+  setExhaustSys(sys);
+  return sys;
 }
 
-export function createWheelDustSystem(carColor, isPlayer) {
-  if (!dustSys) {
-    const col = currentSceneDef.dustColor || 0xffffff;
-    const sys = createWorldPointSystem(400, col, 0.3, 1.2);
-    sys.maxLife = currentSceneDef.id === 'snow' ? 1.5 : 1.0;
-    setDustSys(sys);
-  }
-  return dustSys;
+export function createWheelDustSystem() {
+  const scn = getCurrentSceneDef();
+  const maxLife = scn && scn.id === 'snow' ? 1.5 : 1.0;
+  const sys = createWorldPointSystem(400, 0xcccccc, 0.3, maxLife);
+  setDustSys(sys);
+  return sys;
 }
 
-export function getNitroSys() {
-  if (!nitroFlameSys) setNitroFlameSys(createWorldPointSystem(250, 0x44aaff, 0.4, 0.4));
-  return nitroFlameSys;
+export function createNitroFlameSystem() {
+  const sys = createWorldPointSystem(250, 0x00ffff, 0.4, 0.4);
+  setNitroFlameSys(sys);
+  return sys;
+}
+
+export function initParticleSystems() {
+  createExhaust();
+  createWheelDustSystem();
+  createNitroFlameSystem();
 }

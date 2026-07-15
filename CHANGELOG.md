@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- SPEC.md com especificação completa da arquitetura do jogo
 - Toggle de IA Neural no menu (checkbox)
 - Botão de resetar pesos da IA com status (passos + tamanho)
 - Auto-save da IA ao fechar aba ou trocar de aba
@@ -27,6 +28,27 @@
 - Hiperparâmetros: lr 0.001→0.003, gamma 0.99→0.95, epsilon 1.0→0.6, buffer 100K→30K
 - IA refatorada: separada em updateNeuralAI() e updateRuleBasedAI()
 - Reward reformulado: track alignment bonus, staying on track bonus, backward penalty
+
+## [0.4.0] - 2026-07-15
+
+### Added
+- SPEC.md com documentação detalhada do sistema
+
+### Changed
+- Refatoração massiva do estado: `export let` substituído por getters/setters centralizados em `state.js`
+- Todos os comentários removidos do código (DRY — especificação vive na SPEC.md)
+- `resetVehicle()` movido de `player-control.js` para `car.js`
+- `stepPhysics()` extraído como export em `physics.js`
+- HTML simplificado: removido Google Fonts, importmap Three.js inline, canvas explícito
+- CSS reescrito: seletores simplificados, removido dependência de fontes externas
+- `textures.js` simplificado: chão/rochas/dunas movidos para `track-environment.js`
+- Mesh do carro reescrito com materiais separados e iluminação melhorada
+- `main.js` reescrito com `main()` assíncrono e loading de Ammo.js WASM
+- Áudio com auto-resume de AudioContext suspenso + `pauseAudio()`/`resumeAudio()`
+- `raceLaps` alterado de 3 para 4 no `config.js`
+- HUD com null-safety em elementos DOM
+- Cache de nearestOnCurve por veículo (chave por id)
+- Sistema de exhaust por veículo (opcional, fallback para global)
 
 ## [0.3.0] - 2026-07-15
 

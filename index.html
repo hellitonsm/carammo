@@ -1,125 +1,10 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CarAmmo Deluxe — Corrida 3D</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <title>CarAmmo Deluxe</title>
   <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <!-- ====== MENU PRINCIPAL ====== -->
-  <div id="menu">
-    <div class="menu-bg" aria-hidden="true"></div>
-    <div class="menu-content">
-      <p class="menu-brand">CarAmmo</p>
-      <p class="menu-subtitle">DELUXE · 3 CENÁRIOS</p>
-
-      <h2 class="section-title">Selecione o cenário</h2>
-      <div id="scene-select">
-        <button type="button" class="scene-option" data-scene="forest">
-          <span class="scene-thumb" style="--c1:#2f6b2f;--c2:#3f6e35;">🌲</span>
-          <span class="scene-name">Floresta</span>
-          <span class="scene-desc">Circuito clássico · curvas largas</span>
-        </button>
-        <button type="button" class="scene-option" data-scene="desert">
-          <span class="scene-thumb" style="--c1:#c8863a;--c2:#e8b064;">🏜️</span>
-          <span class="scene-name">Deserto</span>
-          <span class="scene-desc">Dunas · S-curvas · poeira</span>
-        </button>
-        <button type="button" class="scene-option" data-scene="snow">
-          <span class="scene-thumb" style="--c1:#8fb6cf;--c2:#e6eef5;">❄️</span>
-          <span class="scene-name">Nevasca</span>
-          <span class="scene-desc">Gelado · derrapagens · longa reta</span>
-        </button>
-      </div>
-
-      <h2 class="section-title">Escolha seu carro</h2>
-      <div id="car-select">
-        <button type="button" class="car-option" data-color="0xd62828" data-name="Vermelho">
-          <span class="car-preview" style="--car:#d62828"></span>
-          <span>Vermelho</span>
-        </button>
-        <button type="button" class="car-option" data-color="0x1e6bb8" data-name="Azul">
-          <span class="car-preview" style="--car:#1e6bb8"></span>
-          <span>Azul</span>
-        </button>
-        <button type="button" class="car-option" data-color="0x2a9d5c" data-name="Verde">
-          <span class="car-preview" style="--car:#2a9d5c"></span>
-          <span>Verde</span>
-        </button>
-        <button type="button" class="car-option" data-color="0xf4c430" data-name="Amarelo">
-          <span class="car-preview" style="--car:#f4c430"></span>
-          <span>Amarelo</span>
-        </button>
-        <button type="button" class="car-option" data-color="0x1a1a1a" data-name="Preto">
-          <span class="car-preview" style="--car:#1a1a1a;--top:#555"></span>
-          <span>Preto</span>
-        </button>
-      </div>
-
-      <div class="menu-options">
-        <label class="opt">
-          <input type="checkbox" id="opt-ai" checked />
-          <span>3 adversários IA</span>
-        </label>
-        <label class="opt">
-          <input type="checkbox" id="opt-nitro" checked />
-          <span>Nitro (Shift)</span>
-        </label>
-        <label class="opt">
-          <input type="checkbox" id="opt-neural" checked />
-          <span>IA Neural (aprende)</span>
-        </label>
-      </div>
-      <div class="menu-ai-actions">
-        <button type="button" id="reset-ai-btn" class="ai-reset">🧠 Resetar pesos da IA</button>
-        <span id="ai-status" class="ai-status-text"></span>
-      </div>
-
-      <button id="start-btn" disabled>largada</button>
-      <p class="menu-hint">W/S acelerar · A/D virar · Espaço freio · Shift nitro · R reset · C trocar câmera</p>
-    </div>
-  </div>
-
-  <!-- ====== COUNTDOWN ====== -->
-  <div id="countdown" hidden></div>
-
-  <!-- ====== HUD ====== -->
-  <div id="hud" hidden>
-    <div class="hud-left">
-      <div id="speed">0<span>km/h</span></div>
-      <div class="hud-meta">
-        <div id="lap">Volta 0 / 3</div>
-        <div id="lap-time">00:00.000</div>
-        <div id="best-time">Melhor —</div>
-        <div id="position-info">Posição: —</div>
-      </div>
-      <div id="nitro-bar-wrap">
-        <div id="nitro-bar"></div>
-      </div>
-    </div>
-    <canvas id="minimap" width="200" height="200"></canvas>
-    <div id="scene-name-hud"></div>
-    <div id="info">W/S · A/D · Espaço · Shift (nitro) · R · C</div>
-  </div>
-
-  <!-- ====== FINISH ====== -->
-  <div id="finish" hidden>
-    <div class="finish-card">
-      <p class="finish-brand">CarAmmo</p>
-      <h2>Corrida concluída</h2>
-      <div id="race-results"></div>
-      <button type="button" id="restart-btn">Correr de novo</button>
-      <button type="button" id="menu-btn" class="secondary">Voltar ao menu</button>
-    </div>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/gh/kripken/ammo.js@main/builds/ammo.js"></script>
-  <script src="neural-net.js"></script>
-  <script src="rl-agent.js"></script>
   <script type="importmap">
   {
     "imports": {
@@ -127,6 +12,107 @@
     }
   }
   </script>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Menu -->
+  <div id="menu">
+    <div class="menu-bg"></div>
+    <div class="menu-content">
+      <h1 class="logo">CarAmmo Deluxe</h1>
+      <p class="tagline">Corrida 3D · Física Bullet · IA Neural no navegador</p>
+
+      <div class="section-title">Cenário</div>
+      <div class="scene-grid" id="scene-select">
+        <button class="scene-option" data-scene="forest" type="button">
+          <div class="scene-thumb">🌲</div>
+          <span class="scene-name">Floresta</span>
+          <span class="scene-desc">Asfalto · overpass · pinheiros</span>
+        </button>
+        <button class="scene-option" data-scene="desert" type="button">
+          <div class="scene-thumb">🏜️</div>
+          <span class="scene-name">Deserto</span>
+          <span class="scene-desc">Areia · cânions · cactos</span>
+        </button>
+        <button class="scene-option" data-scene="snow" type="button">
+          <div class="scene-thumb">❄️</div>
+          <span class="scene-name">Nevasca</span>
+          <span class="scene-desc">Gelo · ponte · baixa aderência</span>
+        </button>
+      </div>
+
+      <div class="section-title">Cor do carro</div>
+      <div class="car-grid" id="car-select">
+        <button class="car-option" data-color="d62828" type="button" title="Vermelho">
+          <div class="car-preview" style="background:#d62828"></div>
+        </button>
+        <button class="car-option" data-color="1e6bb8" type="button" title="Azul">
+          <div class="car-preview" style="background:#1e6bb8"></div>
+        </button>
+        <button class="car-option" data-color="2a9d5c" type="button" title="Verde">
+          <div class="car-preview" style="background:#2a9d5c"></div>
+        </button>
+        <button class="car-option" data-color="f4c430" type="button" title="Amarelo">
+          <div class="car-preview" style="background:#f4c430"></div>
+        </button>
+        <button class="car-option" data-color="1a1a1a" type="button" title="Preto">
+          <div class="car-preview" style="background:#1a1a1a"></div>
+        </button>
+      </div>
+
+      <div class="section-title">Opções</div>
+      <div class="options-row">
+        <label class="opt"><input type="checkbox" id="opt-ai" checked /> Adversários IA</label>
+        <label class="opt"><input type="checkbox" id="opt-nitro" checked /> Nitro</label>
+        <label class="opt"><input type="checkbox" id="opt-neural" checked /> IA Neural (DQN)</label>
+      </div>
+
+      <div class="ai-panel">
+        <span id="ai-status" class="ai-status-text">IA neural: carregando…</span>
+        <button id="reset-ai-btn" class="btn small" type="button">Resetar IA</button>
+      </div>
+
+      <button id="start-btn" class="btn primary" type="button" disabled>Iniciar Corrida</button>
+
+      <p class="controls-hint">
+        <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> dirigir ·
+        <kbd>Espaço</kbd> freio de mão ·
+        <kbd>Shift</kbd> nitro ·
+        <kbd>C</kbd> câmera ·
+        <kbd>R</kbd> reset ·
+        <kbd>ESC</kbd> pausa
+      </p>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud" hidden>
+    <div class="hud-left">
+      <div id="speed">0<span>km/h</span></div>
+      <div class="hud-meta">
+        <div><span class="label">Volta</span> <span id="lap">Volta 1 / 3</span></div>
+        <div><span class="label">Tempo</span> <span id="lap-time">00:00.000</span></div>
+        <div><span class="label">Melhor</span> <span id="best-time">--:--.---</span></div>
+      </div>
+    </div>
+    <div id="nitro-bar-wrap">
+      <div id="nitro-bar"></div>
+    </div>
+    <canvas id="minimap" width="200" height="200"></canvas>
+    <div id="position-info">Posição: 1/4</div>
+  </div>
+
+  <div id="countdown" hidden>3</div>
+  <div id="pause-overlay" hidden>PAUSA</div>
+  <div id="race-results" hidden></div>
+
+  <!-- Ammo.js (WASM, global) -->
+  <script src="https://cdn.jsdelivr.net/gh/kripken/ammo.js@main/builds/ammo.js"></script>
+  <!-- Neural net + RL agent (globals, before modules) -->
+  <script src="neural-net.js"></script>
+  <script src="rl-agent.js"></script>
+  <!-- Entry point -->
   <script type="module" src="main.js"></script>
 </body>
 </html>

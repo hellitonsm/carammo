@@ -1,42 +1,97 @@
-// ============================================================================
-//  Sky — procedural sky dome + lighting setup per scene
-// ============================================================================
-
 import * as THREE from 'three';
-import { scene, renderer, setSun } from './state.js';
+import {
+  getScene,
+  getRenderer,
+  setSun,
+  getSun,
+} from './state.js';
 
 export function buildSky(scn) {
+  const scene = getScene();
+  const renderer = getRenderer();
+
   scene.background = new THREE.Color(scn.fogColor);
   scene.fog = new THREE.FogExp2(scn.fogColor, scn.fogDensity);
-  scene.children.filter(o => o.isLight || o.isSky).forEach(o => scene.remove(o));
-  scene.add(new THREE.HemisphereLight(scn.hemiSky, scn.hemiGround, scn.hemiInt ?? 0.55));
-  scene.add(new THREE.AmbientLight(scn.ambientColor, scn.ambientInt ?? 0.3));
+
+  // Remove existing lights and sky dome
+  const toRemove = [];
+  scene.traverse((obj) => {
+    if (obj.isLight || obj.userData.isSkyDome) toRemove.push(obj);
+  });
+  for (const o of toRemove) {
+    scene.remove(o);
+    if (o.dispose) o.dispose();
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) {
+      if (Array.isArray(o.material)) o.material.forEach((m) => m.dispose());
+      else o.material.dispose();
+    }
+  }
+
+  // Hemisphere
+  const hemi = new THREE.HemisphereLight(scn.hemiSky, scn.hemiGround, scn.hemiInt);
+  scene.add(hemi);
+
+  // Ambient
+  const amb = new THREE.AmbientLight(scn.ambientColor || 0xffffff, scn.ambientInt);
+  scene.add(amb);
+
+  // Sun directional
   const sun = new THREE.DirectionalLight(scn.sunColor, scn.sunIntensity);
-  sun.position.set(scn.sunAz ?? 60, scn.sunEl ?? 90, 40);
+  const az = (scn.sunAz || 60) * Math.PI / 180;
+  const el = (scn.sunEl || 70) * Math.PI / 180;
+  const dist = 40;
+  sun.position.set(
+    Math.cos(el) * Math.sin(az) * dist,
+    Math.sin(el) * dist,
+    Math.cos(el) * Math.cos(az) * dist
+  );
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.bias = -0.0003;
   sun.shadow.normalBias = 0.03;
-  const s = 180;
-  sun.shadow.camera.left = -s; sun.shadow.camera.right = s;
-  sun.shadow.camera.top = s; sun.shadow.camera.bottom = -s;
-  sun.shadow.camera.far = 400; sun.shadow.camera.near = 10;
-  scene.add(sun); scene.add(sun.target);
+  sun.shadow.camera.left = -180;
+  sun.shadow.camera.right = 180;
+  sun.shadow.camera.top = 180;
+  sun.shadow.camera.bottom = -180;
+  sun.shadow.camera.near = 10;
+  sun.shadow.camera.far = 400;
+  scene.add(sun);
   setSun(sun);
-  renderer.toneMappingExposure = scn.exposure ?? 1.1;
+
+  if (renderer) {
+    renderer.toneMappingExposure = scn.exposure;
+  }
+
+  // Sky dome gradient
   const skyGeo = new THREE.SphereGeometry(1200, 32, 16);
   const skyMat = new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false,
+    side: THREE.BackSide,
+    depthWrite: false,
     uniforms: {
       topColor: { value: new THREE.Color(scn.skyTop) },
       bottomColor: { value: new THREE.Color(scn.skyBottom) },
-      offset: { value: 60 },
-      exponent: { value: 0.55 },
     },
-    vertexShader: `varying vec3 vWP; void main(){ vec4 w=modelMatrix*vec4(position,1.); vWP=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
-    fragmentShader: `uniform vec3 topColor,bottomColor; uniform float offset,exponent; varying vec3 vWP; void main(){ float h=normalize(vWP+vec3(0.,offset,0.)).y; float t=max(pow(max(h,0.),exponent),0.); gl_FragColor=vec4(mix(bottomColor,topColor,t),1.);}`,
+    vertexShader: `
+      varying vec3 vWorldPos;
+      void main() {
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorldPos = wp.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 topColor;
+      uniform vec3 bottomColor;
+      varying vec3 vWorldPos;
+      void main() {
+        float h = normalize(vWorldPos).y;
+        float t = clamp(h * 0.5 + 0.5, 0.0, 1.0);
+        gl_FragColor = vec4(mix(bottomColor, topColor, t), 1.0);
+      }
+    `,
   });
-  const sky = new THREE.Mesh(skyGeo, skyMat);
-  sky.isSky = true;
-  scene.add(sky);
+  const skyDome = new THREE.Mesh(skyGeo, skyMat);
+  skyDome.userData.isSkyDome = true;
+  scene.add(skyDome);
 }

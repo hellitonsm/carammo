@@ -16,6 +16,7 @@ Jogo de corrida 3D usando **Three.js** + **Ammo.js**, com 3 cenários distintos,
 - Texturas procedurais de asfalto e chão
 
 ### IA com Rede Neural (DQN)
+- **4 voltas por corrida** (configurável em `CFG.raceLaps`)
 - **3 adversários IA** (Rocket, Flash, Shadow) com níveis de habilidade
 - **Rede neural treina em tempo real** no browser durante as corridas
 - **Agente DQN** com replay buffer, epsilon-greedy, Double DQN, target network
@@ -75,22 +76,24 @@ Acesse `http://localhost:2626` no navegador.
 ## Tecnologias
 
 - **Three.js** 0.160 (via importmap CDN)
-- **Ammo.js** (Bullet Physics para WebAssembly)
+- **Ammo.js** (Bullet Physics para WebAssembly via WASM assíncrono)
 - HTML5/CSS3/JavaScript ES modules — sem build, sem bundler
 - **Web Audio API** para som do motor em tempo real
+- **Código sem comentários** — toda a documentação vive na `SPEC.md`
 
 ## Estrutura
 
 ```
 carammo/
 ├── index.html              # Menu, HUD e tela de resultados
-├── main.js                 # Entry point (206 linhas)
+├── main.js                 # Entry point async (Ammo WASM loading)
 ├── style.css               # Estilos do menu, HUD e paineis
 ├── scenarios.js            # Definicao dos 3 cenarios
 ├── neural-net.js           # Rede neural (3 camadas, Adam, ReLU)
 ├── rl-agent.js             # Agente DQN (replay buffer, epsilon-greedy)
+├── SPEC.md                 # Especificacao completa da arquitetura
 ├── js/
-│   ├── state.js            # Estado compartilhado com setters
+│   ├── state.js            # Estado mutavel central + getters/setters
 │   ├── config.js           # Constantes (CFG)
 │   ├── physics.js          # Mundo Ammo.js
 │   ├── sky.js              # Ceu procedural
@@ -98,7 +101,7 @@ carammo/
 │   ├── track-helpers.js    # Geometria pura (ribbon, offset)
 │   ├── track-build.js      # Construcao da pista + colisao
 │   ├── track-environment.js # Arvores, rochas, cenario
-│   ├── car.js              # Mesh do carro + corpo Ammo
+│   ├── car.js              # Mesh do carro + corpo Ammo (contem resetVehicle)
 │   ├── particles.js        # Sistemas de particulas
 │   ├── fx.js               # Escape, poeira, nitro, speed lines
 │   ├── player-control.js   # Input do teclado + fisica
@@ -110,6 +113,7 @@ carammo/
 │   ├── main-loop.js        # requestAnimationFrame
 │   ├── skid-marks.js       # Marcas de pneu
 │   └── audio.js            # Som do motor
+├── CHANGELOG.md
 └── README.md
 ```
 

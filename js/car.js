@@ -1,137 +1,348 @@
-// ============================================================================
-//  Car — vehicle mesh creation + Ammo physics body + raycast vehicle
-// ============================================================================
-
 import * as THREE from 'three';
+import {
+  getScene,
+  getPhysicsWorld,
+  getTrackStartPos,
+  getTrackStartDir,
+  getTrackCurve,
+  getCurrentSceneDef,
+  getVehicles,
+  setVehicles,
+  setPlayerVehicle,
+  getPlayerVehicle,
+} from './state.js';
 import { CFG } from './config.js';
-import { scene, physicsWorld, vehicles, playerVehicle, trackCurve, trackLength,
-         currentSceneDef, setVehicles, setPlayerVehicle } from './state.js';
-import { createExhaust, createWheelDustSystem } from './particles.js';
-
-
+import { nearestOnCurve } from './track-helpers.js';
 
 export function buildCarMesh(colorHex) {
-  const h = CFG.chassisSize;
   const g = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.28, metalness: 0.75 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(h.x * 2, h.y * 2, h.z * 2), bodyMat);
-  body.castShadow = true; g.add(body);
-  const hood = new THREE.Mesh(new THREE.BoxGeometry(h.x * 1.9, h.y * 0.7, h.z * 0.7), bodyMat);
-  hood.position.set(0, h.y * 0.35, h.z * 0.65); hood.castShadow = true; g.add(hood);
-  const cabMat = new THREE.MeshStandardMaterial({ color: 0x111, roughness: 0.08, metalness: 0.9, transparent: true, opacity: 0.65 });
-  const cab = new THREE.Mesh(new THREE.BoxGeometry(h.x * 1.55, h.y * 1.1, h.z * 1.0), cabMat);
-  cab.position.set(0, h.y + h.y * 0.35, -h.z * 0.05); cab.castShadow = true; g.add(cab);
-  const bm = new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.55 });
-  const bg = new THREE.BoxGeometry(h.x * 2.1, h.y * 0.7, 0.3);
-  const fb = new THREE.Mesh(bg, bm); fb.position.set(0, -h.y * 0.2, h.z + 0.15); g.add(fb);
-  const rb = new THREE.Mesh(bg, bm); rb.position.set(0, -h.y * 0.2, -h.z - 0.15); g.add(rb);
-  const hlM = new THREE.MeshStandardMaterial({ color: 0xffffee, emissive: 0xffffaa, emissiveIntensity: 1.3 });
-  const hlG = new THREE.SphereGeometry(0.14, 12, 12);
-  const hlL = new THREE.Mesh(hlG, hlM); hlL.position.set(-h.x * 0.7, 0, h.z + 0.1); g.add(hlL);
-  const hlR = new THREE.Mesh(hlG, hlM); hlR.position.set(h.x * 0.7, 0, h.z + 0.1); g.add(hlR);
-  const beamL = new THREE.SpotLight(0xfff5d6, 1.8, 30, Math.PI / 7, 0.5, 1.3);
-  beamL.position.set(-h.x * 0.7, 0, h.z + 0.1);
-  beamL.target.position.set(-h.x * 0.7, -0.4, h.z + 12); g.add(beamL); g.add(beamL.target);
-  const beamR = new THREE.SpotLight(0xfff5d6, 1.8, 30, Math.PI / 7, 0.5, 1.3);
-  beamR.position.set(h.x * 0.7, 0, h.z + 0.1);
-  beamR.target.position.set(h.x * 0.7, -0.4, h.z + 12); g.add(beamR); g.add(beamR.target);
-  const tlM = new THREE.MeshStandardMaterial({ color: 0xff2020, emissive: 0xff0000, emissiveIntensity: 0.5 });
-  const tlG = new THREE.SphereGeometry(0.11, 12, 12);
-  const tlL = new THREE.Mesh(tlG, tlM); tlL.position.set(-h.x * 0.7, 0, -h.z - 0.1); g.add(tlL);
-  const tlR = new THREE.Mesh(tlG, tlM); tlR.position.set(h.x * 0.7, 0, -h.z - 0.1); g.add(tlR);
-  const spM = new THREE.MeshStandardMaterial({ color: 0x111, roughness: 0.3 });
-  const spG = new THREE.BoxGeometry(h.x * 1.7, 0.08, 0.35);
-  const sp = new THREE.Mesh(spG, spM); sp.position.set(0, h.y * 1.15, -h.z * 0.8); g.add(sp);
-  const supG = new THREE.BoxGeometry(0.08, 0.3, 0.08);
-  const suL = new THREE.Mesh(supG, spM); suL.position.set(-h.x * 0.65, h.y * 0.95, -h.z * 0.8); g.add(suL);
-  const suR = new THREE.Mesh(supG, spM); suR.position.set(h.x * 0.65, h.y * 0.95, -h.z * 0.8); g.add(suR);
-  const exG = new THREE.CylinderGeometry(0.08, 0.08, 0.25, 8);
-  const exM = new THREE.MeshStandardMaterial({ color: 0x888, metalness: 0.9, roughness: 0.3 });
-  const eL = new THREE.Mesh(exG, exM); eL.rotation.x = Math.PI / 2; eL.position.set(-h.x * 0.4, -h.y * 0.7, -h.z - 0.25); g.add(eL);
-  const eR = new THREE.Mesh(exG, exM); eR.rotation.x = Math.PI / 2; eR.position.set(h.x * 0.4, -h.y * 0.7, -h.z - 0.25); g.add(eR);
-  g.userData.tlMat = tlM; g.userData.bodyMat = bodyMat;
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: colorHex,
+    roughness: 0.28,
+    metalness: 0.75,
+  });
+  const darkMat = new THREE.MeshStandardMaterial({
+    color: 0x111111,
+    roughness: 0.4,
+    metalness: 0.9,
+  });
+  const bumperMat = new THREE.MeshStandardMaterial({
+    color: 0x222222,
+    roughness: 0.5,
+    metalness: 0.6,
+  });
+
+  // Body
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(CFG.chassisSize.x * 2, CFG.chassisSize.y * 2, CFG.chassisSize.z * 2),
+    bodyMat
+  );
+  body.position.y = 0.5;
+  body.castShadow = true;
+  g.add(body);
+
+  // Hood
+  const hood = new THREE.Mesh(
+    new THREE.BoxGeometry(CFG.chassisSize.x * 1.8, CFG.chassisSize.y * 0.6, CFG.chassisSize.z * 0.8),
+    bodyMat
+  );
+  hood.position.set(0, 0.55, CFG.chassisSize.z * 0.7);
+  hood.castShadow = true;
+  g.add(hood);
+
+  // Cab
+  const cabMat = new THREE.MeshStandardMaterial({
+    color: 0x111111,
+    roughness: 0.2,
+    metalness: 0.9,
+    transparent: true,
+    opacity: 0.65,
+  });
+  const cab = new THREE.Mesh(
+    new THREE.BoxGeometry(CFG.chassisSize.x * 1.6, CFG.chassisSize.y * 1.2, CFG.chassisSize.z * 0.9),
+    cabMat
+  );
+  cab.position.set(0, 1.0, -0.15);
+  cab.castShadow = true;
+  g.add(cab);
+
+  // Bumpers
+  const fBumper = new THREE.Mesh(
+    new THREE.BoxGeometry(2.1, 0.35, 0.3),
+    bumperMat
+  );
+  fBumper.position.set(0, 0.3, CFG.chassisSize.z + 0.1);
+  g.add(fBumper);
+  const rBumper = new THREE.Mesh(
+    new THREE.BoxGeometry(2.1, 0.35, 0.3),
+    bumperMat
+  );
+  rBumper.position.set(0, 0.3, -CFG.chassisSize.z - 0.1);
+  g.add(rBumper);
+
+  // Headlights
+  const hlMat = new THREE.MeshStandardMaterial({
+    color: 0xffffee,
+    emissive: 0xffffaa,
+    emissiveIntensity: 1.2,
+  });
+  for (let side = -1; side <= 1; side += 2) {
+    const hl = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), hlMat);
+    hl.position.set(side * 0.7, 0.45, CFG.chassisSize.z + 0.15);
+    g.add(hl);
+    const spot = new THREE.SpotLight(0xffffcc, 0.8, 40, Math.PI / 7, 0.4, 1);
+    spot.position.copy(hl.position);
+    spot.target.position.set(side * 0.7, 0.3, CFG.chassisSize.z + 10);
+    g.add(spot);
+    g.add(spot.target);
+  }
+
+  // Taillights
+  const tlMat = new THREE.MeshStandardMaterial({
+    color: 0xff0000,
+    emissive: 0xff0000,
+    emissiveIntensity: 0.5,
+  });
+  for (let side = -1; side <= 1; side += 2) {
+    const tl = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 8), tlMat);
+    tl.position.set(side * 0.7, 0.45, -CFG.chassisSize.z - 0.15);
+    g.add(tl);
+  }
+  g.userData.tlMat = tlMat;
+  g.userData.bodyMat = bodyMat;
+
+  // Spoiler
+  const spoiler = new THREE.Mesh(
+    new THREE.BoxGeometry(1.7, 0.08, 0.35),
+    darkMat
+  );
+  spoiler.position.set(0, 1.15, -CFG.chassisSize.z * 0.85);
+  g.add(spoiler);
+  for (let side = -1; side <= 1; side += 2) {
+    const support = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.35, 0.06),
+      darkMat
+    );
+    support.position.set(side * 0.6, 0.95, -CFG.chassisSize.z * 0.85);
+    g.add(support);
+  }
+
+  // Exhausts
+  const exMat = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.9, roughness: 0.3 });
+  for (let side = -1; side <= 1; side += 2) {
+    const ex = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.08, 0.25, 8),
+      exMat
+    );
+    ex.rotation.x = Math.PI / 2;
+    ex.position.set(side * 0.4, 0.25, -CFG.chassisSize.z - 0.3);
+    g.add(ex);
+  }
+
   return g;
 }
 
-export function createVehicle(colorHex, startIdx = 0, isPlayer = false, name = 'Player', skill = 0.85) {
-  const Ammo = window.Ammo;
-  const h = CFG.chassisSize;
+export function createVehicle(colorHex, startIdx, isPlayer, name, skill) {
+  const scene = getScene();
+  const physicsWorld = getPhysicsWorld();
+  const startPos = getTrackStartPos();
+  const startDir = getTrackStartDir();
+  const scn = getCurrentSceneDef();
+
   const mesh = buildCarMesh(colorHex);
   scene.add(mesh);
+
+  // Compound shape — chassis box centered slightly above origin so wheels hang below
   const compound = new Ammo.btCompoundShape();
-  const box = new Ammo.btBoxShape(new Ammo.btVector3(h.x, h.y, h.z));
-  const ch = new Ammo.btTransform(); ch.setIdentity(); ch.setOrigin(new Ammo.btVector3(0, 2.0, 0));
-  compound.addChildShape(ch, box);
-
-  // Place car on the actual track curve (not fixed world offsets that miss the collision mesh)
-  const col = startIdx % 2, row = Math.floor(startIdx / 2);
-  const curveT = (startIdx * 3) / trackLength; // small t increment per car along curve
-  const curvePt = trackCurve.getPointAt(curveT);
-  const curveTan = trackCurve.getTangentAt(curveT);
-  const normal = new THREE.Vector3(-curveTan.z, 0, curveTan.x).normalize();
-  const startP = new THREE.Vector3(
-    curvePt.x + normal.x * (col === 0 ? -1 : 1) * 1.8,
-    curvePt.y + CFG.wheelRadius + 0.6,
-    curvePt.z + normal.z * (col === 0 ? -1 : 1) * 1.8
+  const boxShape = new Ammo.btBoxShape(
+    new Ammo.btVector3(CFG.chassisSize.x, CFG.chassisSize.y, CFG.chassisSize.z)
   );
+  const localTrans = new Ammo.btTransform();
+  localTrans.setIdentity();
+  localTrans.setOrigin(new Ammo.btVector3(0, CFG.chassisSize.y, 0));
+  compound.addChildShape(localTrans, boxShape);
 
-  const st = new Ammo.btTransform(); st.setIdentity();
-  st.setOrigin(new Ammo.btVector3(startP.x, startP.y, startP.z));
-  const yaw = Math.atan2(curveTan.x, curveTan.z);
-  st.setRotation(new Ammo.btQuaternion(0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)));
+  // Grid starting positions
+  const col = startIdx % 2;
+  const row = Math.floor(startIdx / 2);
+  // perpendicular
+  let nx = -startDir.z, nz = startDir.x;
+  const nlen = Math.hypot(nx, nz) || 1;
+  nx /= nlen; nz /= nlen;
+  const lateral = (col === 0 ? -1 : 1) * 2.5;
+  const back = -5 * row - 1;
+  const px = startPos.x + nx * lateral + startDir.x * back;
+  // Raise so suspension has room (wheel radius + rest length + margin)
+  const py = startPos.y + 0.4;
+  const pz = startPos.z + nz * lateral + startDir.z * back;
 
-  const ms = new Ammo.btDefaultMotionState(st);
-  const li = new Ammo.btVector3(0, 0, 0);
-  compound.calculateLocalInertia(CFG.chassisMass, li);
-  const body = new Ammo.btRigidBody(new Ammo.btRigidBodyConstructionInfo(CFG.chassisMass, ms, compound, li));
-  body.setDamping(0.3, 0.95); physicsWorld.addRigidBody(body);
+  const transform = new Ammo.btTransform();
+  transform.setIdentity();
+  transform.setOrigin(new Ammo.btVector3(px, py, pz));
+  const yaw = Math.atan2(startDir.x, startDir.z);
+  const q = new Ammo.btQuaternion();
+  q.setRotation(new Ammo.btVector3(0, 1, 0), yaw);
+  transform.setRotation(q);
 
+  const mass = CFG.chassisMass;
+  const localInertia = new Ammo.btVector3(0, 0, 0);
+  compound.calculateLocalInertia(mass, localInertia);
+  const motionState = new Ammo.btDefaultMotionState(transform);
+  const rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, compound, localInertia);
+  const body = new Ammo.btRigidBody(rbInfo);
+  body.setActivationState(4); // DISABLE_DEACTIVATION
+  body.setDamping(0.3, 0.95);
+  body.setFriction(0.5);
+  physicsWorld.addRigidBody(body);
+
+  // Raycast vehicle
   const tuning = new Ammo.btVehicleTuning();
-  const ray = new Ammo.btDefaultVehicleRaycaster(physicsWorld);
-  const veh = new Ammo.btRaycastVehicle(tuning, body, ray);
-  veh.setCoordinateSystem(0, 1, 2); physicsWorld.addAction(veh);
+  const rayCaster = new Ammo.btDefaultVehicleRaycaster(physicsWorld);
+  const vehicle = new Ammo.btRaycastVehicle(tuning, body, rayCaster);
+  vehicle.setCoordinateSystem(0, 1, 2);
+  physicsWorld.addAction(vehicle);
 
-  const wd = new Ammo.btVector3(0, -1, 0), wa = new Ammo.btVector3(-1, 0, 0);
-  const tG = new THREE.CylinderGeometry(CFG.wheelRadius, CFG.wheelRadius, CFG.wheelWidth, 18);
-  const tM = new THREE.MeshStandardMaterial({ color: 0x111, roughness: 0.9 });
-  const rG = new THREE.CylinderGeometry(CFG.wheelRadius * 0.6, CFG.wheelRadius * 0.6, CFG.wheelWidth * 0.9, 12);
-  const rM = new THREE.MeshStandardMaterial({ color: 0xccc, roughness: 0.25, metalness: 0.85 });
-  const wPos = [
-    { x: -CFG.wheelAxisOffset.x, y: CFG.wheelAxisOffset.y, z: CFG.wheelAxisOffset.z, f: true },
-    { x: CFG.wheelAxisOffset.x, y: CFG.wheelAxisOffset.y, z: CFG.wheelAxisOffset.z, f: true },
-    { x: -CFG.wheelAxisOffset.x, y: CFG.wheelAxisOffset.y, z: -CFG.wheelAxisOffset.z, f: false },
-    { x: CFG.wheelAxisOffset.x, y: CFG.wheelAxisOffset.y, z: -CFG.wheelAxisOffset.z, f: false },
-  ];
+  const frictionSlip = (scn ? scn.trackFriction : 0.88) * 10;
+  const wheelDir = new Ammo.btVector3(0, -1, 0);
+  const wheelAxle = new Ammo.btVector3(-1, 0, 0);
+  const suspensionRest = 0.35;
+  const suspensionTravel = 10000; // cm
   const wheels = [];
-  wPos.forEach(p => {
-    veh.addWheel(new Ammo.btVector3(p.x, p.y, p.z), wd, wa, 0.4, CFG.wheelRadius, tuning, p.f);
-    const gr = new THREE.Group();
-    const tire = new THREE.Mesh(tG, tM); tire.castShadow = true; tire.rotation.z = Math.PI / 2; gr.add(tire);
-    const rim = new THREE.Mesh(rG, rM); rim.rotation.z = Math.PI / 2; gr.add(rim);
-    scene.add(gr); wheels.push(gr);
-  });
+
+  const wheelPositions = [
+    { x: CFG.wheelAxisOffset.x, y: CFG.wheelAxisOffset.y, z: CFG.wheelAxisOffset.z, front: true },
+    { x: -CFG.wheelAxisOffset.x, y: CFG.wheelAxisOffset.y, z: CFG.wheelAxisOffset.z, front: true },
+    { x: CFG.wheelAxisOffset.x, y: CFG.wheelAxisOffset.y, z: -CFG.wheelAxisOffset.z, front: false },
+    { x: -CFG.wheelAxisOffset.x, y: CFG.wheelAxisOffset.y, z: -CFG.wheelAxisOffset.z, front: false },
+  ];
+
   for (let i = 0; i < 4; i++) {
-    const wi = veh.getWheelInfo(i);
+    const wp = wheelPositions[i];
+    const conn = new Ammo.btVector3(wp.x, wp.y, wp.z);
+    vehicle.addWheel(
+      conn,
+      wheelDir,
+      wheelAxle,
+      suspensionRest,
+      CFG.wheelRadius,
+      tuning,
+      wp.front
+    );
+
+    const wi = vehicle.getWheelInfo(i);
     wi.set_m_suspensionStiffness(50);
     wi.set_m_wheelsDampingRelaxation(8);
     wi.set_m_wheelsDampingCompression(20);
-    wi.set_m_frictionSlip(currentSceneDef.trackFriction * 10);
+    wi.set_m_frictionSlip(frictionSlip);
     wi.set_m_rollInfluence(0.005);
+    wi.set_m_maxSuspensionForce(6000);
+
+    // Wheel mesh
+    const wheelGroup = new THREE.Group();
+    const tire = new THREE.Mesh(
+      new THREE.CylinderGeometry(CFG.wheelRadius, CFG.wheelRadius, CFG.wheelWidth, 16),
+      new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 })
+    );
+    tire.rotation.z = Math.PI / 2;
+    tire.castShadow = true;
+    wheelGroup.add(tire);
+    const rim = new THREE.Mesh(
+      new THREE.CylinderGeometry(CFG.wheelRadius * 0.55, CFG.wheelRadius * 0.55, CFG.wheelWidth * 1.1, 12),
+      new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.8, roughness: 0.3 })
+    );
+    rim.rotation.z = Math.PI / 2;
+    wheelGroup.add(rim);
+    scene.add(wheelGroup);
+    wheels.push(wheelGroup);
   }
 
-  createExhaust();
-  createWheelDustSystem(colorHex, isPlayer);
+  const startP = new THREE.Vector3(px, py, pz);
 
-  return {
-    mesh, body, vehicle: veh, wheels, color: colorHex, isPlayer, name,
-    progress: 0, lap: 0, lastT: 0, lastLap: 0, finished: false, finishTime: 0,
-    aiSkill: skill, aiState: { steer: 0, accel: 0, lookahead: 35 + Math.random() * 10, error: 0, errorTimer: 0, stuckTimer: 0, offTrackTimer: 0 },
-    ramp: 0, startP, startDir: curveTan.clone(),
+  const curve = getTrackCurve();
+  let initT = 0;
+  if (curve) {
+    initT = nearestOnCurve(curve, startP).t;
+  }
+
+  const v = {
+    mesh,
+    body,
+    vehicle,
+    wheels,
+    color: colorHex,
+    isPlayer,
+    name,
+    progress: initT,
+    lap: 0,
+    lastT: initT,
+    lastLap: 0,
+    finished: false,
+    finishTime: 0,
+    aiSkill: skill || 1.0,
+    aiState: {
+      steer: 0,
+      accel: 0,
+      lookahead: 35 + Math.random() * 10,
+      error: 0,
+      errorTimer: 0,
+      stuckTimer: 0,
+    },
+    ramp: 0,
+    startP,
+    exhaust: null, // shared via getExhaustSys()
+    dustSys: null,
+    prevSpeed: 0,
+    lastAction: null,
+    lastState: null,
+    lastProgress: 0,
   };
+
+  return v;
 }
 
 export function addVehicle(v) {
-  const arr = [...vehicles, v];
-  setVehicles(arr);
+  const vehicles = getVehicles();
+  setVehicles([...vehicles, v]);
   if (v.isPlayer) setPlayerVehicle(v);
+}
+
+export function resetVehicle(v, full) {
+  if (!v || !v.body) return;
+  const transform = new Ammo.btTransform();
+  transform.setIdentity();
+  transform.setOrigin(new Ammo.btVector3(v.startP.x, v.startP.y, v.startP.z));
+
+  const startDir = getTrackStartDir();
+  if (startDir) {
+    const yaw = Math.atan2(startDir.x, startDir.z);
+    const q = new Ammo.btQuaternion();
+    q.setRotation(new Ammo.btVector3(0, 1, 0), yaw);
+    transform.setRotation(q);
+  }
+
+  v.body.setWorldTransform(transform);
+  v.body.setLinearVelocity(new Ammo.btVector3(0, 0, 0));
+  v.body.setAngularVelocity(new Ammo.btVector3(0, 0, 0));
+  v.body.clearForces();
+  v.body.activate();
+
+  // Also reset motion state
+  const ms = v.body.getMotionState();
+  if (ms) ms.setWorldTransform(transform);
+
+  const curve = getTrackCurve();
+  const resetP = new THREE.Vector3(v.startP.x, v.startP.y, v.startP.z);
+  let resetT = 0;
+  if (curve) {
+    resetT = nearestOnCurve(curve, resetP).t;
+  }
+  v.progress = resetT;
+  v.lap = 0;
+  v.ramp = 0;
+  v.lastT = resetT;
+  v.aiState.stuckTimer = 0;
+  if (full) {
+    v.finished = false;
+    v.finishTime = 0;
+  }
 }

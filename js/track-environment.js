@@ -1,627 +1,806 @@
-// ============================================================================
-//  Track environment — trees, rocks, flowers, buildings, terrain features
-// ============================================================================
-
 import * as THREE from 'three';
-import { scene, trackLength, trackWidth, trackStartPos, snowParticles, setSnowParticles } from './state.js';
-import { nearestOnCurve, offsetCurve, buildRibbon } from './track-helpers.js';
+import {
+  getScene,
+  setSnowParticles,
+  getSnowParticles as getSnowParticlesRef,
+  getPlayerVehicle,
+} from './state.js';
+import { nearestOnCurve, clearanceFromTrack } from './track-helpers.js';
+
+/**
+ * Shared placement helper: sample along the track, offset outward by a
+ * distance that clears the asphalt + margin. Rejects if still too close
+ * (e.g. near hairpins where both sides of the ribbon approach).
+ */
+function sampleOutside(curve, scn, wFn, minClear, maxClear, opts = {}) {
+  const startP = curve.getPointAt(0);
+  const avoidStart = opts.avoidStart ?? 35;
+  const maxAttempts = opts.maxAttempts ?? 40;
+  for (let a = 0; a < maxAttempts; a++) {
+    const t = opts.t != null ? opts.t : Math.random();
+    const p = curve.getPointAt(t);
+    const tan = curve.getTangentAt(t);
+    let nx = -tan.z, nz = tan.x;
+    const nlen = Math.hypot(nx, nz) || 1;
+    nx /= nlen; nz /= nlen;
+    const side = opts.side != null ? opts.side : (Math.random() < 0.5 ? 1 : -1);
+    const half = (scn.trackWidth / 2) * (wFn ? wFn(t) : 1);
+    const dist = half + minClear + Math.random() * Math.max(0.1, maxClear - minClear);
+    const x = p.x + nx * side * dist;
+    const z = p.z + nz * side * dist;
+    if (Math.hypot(x - startP.x, z - startP.z) < avoidStart) continue;
+    // Verify global clearance (handles pinch points / elevated overpasses in XZ)
+    const clear = clearanceFromTrack(curve, x, z, scn.trackWidth, wFn);
+    if (clear < minClear * 0.85) continue;
+    return { x, y: p.y, z, t, side, nx, nz, tan, clear };
+  }
+  return null;
+}
 
 export function buildEnvironment(scn, curve, bound, wFn) {
-  placeTrees(scn, curve, bound);
+  placeTrees(scn, curve, wFn);
   if (scn.hasLamps) placeLamps(scn, curve, wFn);
   if (scn.hasCones) placeCones(scn, curve, wFn);
   if (scn.hasRocks) placeRocks(scn, curve, wFn);
 
   if (scn.id === 'forest') {
-    if (scn.hasFlowers) addFlowers(curve, bound, wFn);
-    if (scn.hasSheds) addSheds(curve, bound, wFn);
-    if (scn.hasSigns) addSigns(curve);
-    addBroadleafTrees(curve, bound);
+    addFlowers(curve, scn, wFn);
+    addSheds(curve, scn, wFn);
+    addSigns(curve, scn, wFn);
+    addBroadleafTrees(curve, scn, wFn);
+  } else if (scn.id === 'desert') {
+    addDunes(curve, scn, wFn);
+    addCanyon(curve, scn, wFn);
+    addBarrels(curve, scn, wFn);
+    addTumbleweeds(curve, scn, wFn);
+  } else if (scn.id === 'snow') {
+    addSnowPiles(curve, scn, wFn);
+    addSnowmen(curve, scn, wFn);
+    addSnowTracks(curve, wFn, scn);
+    addBridge(curve, scn, wFn);
+    addFrozenLakes(curve, scn, wFn);
+    if (scn.snowParticles) createSnowParticles();
   }
-  if (scn.id === 'desert') {
-    addDunes(curve, wFn);
-    addCanyon(curve, wFn);
-    if (scn.hasBarrels) addBarrels(curve, wFn);
-    if (scn.hasTumbleweeds) addTumbleweeds(curve, bound, wFn);
-  }
-  if (scn.id === 'snow') {
-    if (scn.hasSnowPiles) addSnowPiles(curve, wFn);
-    if (scn.hasSnowmen) addSnowmen(curve, wFn);
-    addSnowTracks(curve, wFn);
-    addBridge(curve, wFn);
-    addFrozenLakes(curve, bound);
-  }
-  if (scn.snowParticles) createSnowParticles();
 }
 
-function placeTrees(scn, curve, bound) {
-  let trunkGeo, trunkMat, leafGeo, leafMat;
-  const treeType = scn.treeType || 'pine';
+function placeTrees(scn, curve, wFn) {
+  const scene = getScene();
+  const count = scn.treeCount || 50;
+  // Keep foliage well clear of the racing line
+  const minClear = Math.max(scn.treeDensity || 14, scn.trackWidth / 2 + 6);
 
-  if (treeType === 'cactus') {
-    trunkGeo = new THREE.CylinderGeometry(0.5, 0.55, 4, 10);
-    trunkMat = new THREE.MeshStandardMaterial({ color: scn.treeTrunkColor ?? 0x5a7a3a, roughness: 0.85 });
-    leafGeo = trunkGeo; leafMat = trunkMat;
-  } else if (treeType === 'pine-snow') {
-    trunkGeo = new THREE.CylinderGeometry(0.28, 0.4, 2.0, 8);
-    trunkMat = new THREE.MeshStandardMaterial({ color: scn.treeTrunkColor ?? 0x3a2818, roughness: 0.95 });
-    leafGeo = new THREE.ConeGeometry(1.9, 5, 9);
-    leafMat = new THREE.MeshStandardMaterial({ color: 0x2a4030, roughness: 0.9 });
-  } else {
-    trunkGeo = new THREE.CylinderGeometry(0.3, 0.45, 1.8, 8);
-    trunkMat = new THREE.MeshStandardMaterial({ color: scn.treeTrunkColor ?? 0x6b4423, roughness: 0.9 });
-    leafGeo = new THREE.ConeGeometry(1.7, 4.5, 8);
-    leafMat = new THREE.MeshStandardMaterial({ color: 0x2f6b2f, roughness: 0.85 });
-  }
+  if (scn.treeType === 'pine' || scn.treeType === 'pine-snow') {
+    const trunkGeo = new THREE.CylinderGeometry(0.15, 0.25, 1.2, 6);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3020, roughness: 0.9 });
+    const leafGeo = new THREE.ConeGeometry(1.2, 3.5, 7);
+    const leafMat = new THREE.MeshStandardMaterial({
+      color: scn.treeType === 'pine-snow' ? 0x1a3a1a : 0x2d6a2d,
+      roughness: 0.85,
+    });
+    const snowCapGeo = new THREE.ConeGeometry(1.0, 1.2, 7);
+    const snowCapMat = new THREE.MeshStandardMaterial({ color: 0xf0f4f8, roughness: 0.9 });
 
-  const n = scn.treeCount;
-  const tMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, n);
-  const lMesh = treeType === 'cactus' ? null : new THREE.InstancedMesh(leafGeo, leafMat, n);
-  tMesh.castShadow = true;
-  if (lMesh) { lMesh.castShadow = true; lMesh.receiveShadow = true; scene.add(lMesh); }
-  scene.add(tMesh);
-
-  let armMesh = null, capMesh = null, capMesh2 = null;
-  if (treeType === 'cactus') {
-    const armGeo = new THREE.CylinderGeometry(0.25, 0.28, 1.6, 8);
-    armMesh = new THREE.InstancedMesh(armGeo, trunkMat, n * 2);
-    armMesh.castShadow = true; scene.add(armMesh);
-  }
-  if (treeType === 'pine-snow') {
-    const capGeo = new THREE.ConeGeometry(1.5, 1.4, 9);
-    const capMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
-    capMesh = new THREE.InstancedMesh(capGeo, capMat, n);
-    capMesh.castShadow = true; scene.add(capMesh);
-    const capGeo2 = new THREE.ConeGeometry(2.2, 0.8, 9);
-    capMesh2 = new THREE.InstancedMesh(capGeo2, capMat, n);
-    capMesh2.castShadow = true; scene.add(capMesh2);
-  }
-
-  const dummy = new THREE.Object3D();
-  let placed = 0, armPlaced = 0, attempts = 0;
-  const minDist = scn.treeDensity ?? 15;
-  while (placed < n && attempts < n * 12) {
-    attempts++;
-    const x = bound.minX + Math.random() * (bound.maxX - bound.minX);
-    const z = bound.minZ + Math.random() * (bound.maxZ - bound.minZ);
-    const nr = nearestOnCurve(curve, new THREE.Vector3(x, 0, z));
-    if (nr.dist < minDist) continue;
-    if (Math.hypot(x - trackStartPos.x, z - trackStartPos.z) < 30) continue;
-
-    const scale = 0.7 + Math.random() * 1.6;
-    if (treeType === 'cactus') {
-      const th = 4 * scale;
-      dummy.position.set(x, th / 2 - 0.45, z);
-      dummy.rotation.set(0, Math.random() * Math.PI * 2, 0);
-      dummy.scale.set(scale * 0.9, scale, scale * 0.9);
-      dummy.updateMatrix(); tMesh.setMatrixAt(placed, dummy.matrix);
-      const arms = Math.random() < 0.7 ? (Math.random() < 0.5 ? 1 : 2) : 0;
-      for (let a = 0; a < arms; a++) {
-        const side = a === 0 ? 1 : -1;
-        dummy.position.set(x + side * 0.55 * scale, th * 0.5, z);
-        dummy.rotation.set(0, 0, side * 0.3);
-        dummy.scale.set(scale * 0.7, scale * 0.7, scale * 0.7);
-        dummy.updateMatrix();
-        if (armPlaced < n * 2) { armMesh.setMatrixAt(armPlaced, dummy.matrix); armPlaced++; }
-      }
-    } else if (treeType === 'pine-snow') {
-      const th = 2.0 * scale;
-      dummy.position.set(x, th / 2, z);
-      dummy.rotation.set(0, Math.random() * Math.PI * 2, 0);
-      dummy.scale.set(scale, scale, scale);
-      dummy.updateMatrix(); tMesh.setMatrixAt(placed, dummy.matrix);
-      const lh = 5 * scale;
-      dummy.position.set(x, th + lh / 2 - 0.2, z);
-      dummy.updateMatrix(); lMesh.setMatrixAt(placed, dummy.matrix);
-      dummy.position.set(x, th + lh - 0.5, z);
-      dummy.updateMatrix(); capMesh.setMatrixAt(placed, dummy.matrix);
-      dummy.position.set(x, th + lh * 0.45, z);
-      dummy.updateMatrix(); capMesh2.setMatrixAt(placed, dummy.matrix);
-    } else {
-      const th = 1.8 * scale;
-      dummy.position.set(x, th / 2 - 0.45, z);
-      dummy.rotation.set(0, Math.random() * Math.PI * 2, 0);
-      dummy.scale.set(scale, scale, scale);
-      dummy.updateMatrix(); tMesh.setMatrixAt(placed, dummy.matrix);
-      const lh = 4.5 * scale;
-      dummy.position.set(x, th + lh / 2 - 0.45, z);
-      dummy.updateMatrix(); lMesh.setMatrixAt(placed, dummy.matrix);
+    const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
+    const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, count);
+    let snowMesh = null;
+    let snowMesh2 = null;
+    if (scn.treeType === 'pine-snow') {
+      snowMesh = new THREE.InstancedMesh(snowCapGeo, snowCapMat, count);
+      snowMesh2 = new THREE.InstancedMesh(new THREE.ConeGeometry(0.6, 0.7, 7), snowCapMat, count);
     }
-    placed++;
+
+    const dummy = new THREE.Object3D();
+    let placed = 0;
+    let attempts = 0;
+    while (placed < count && attempts < count * 25) {
+      attempts++;
+      const s = sampleOutside(curve, scn, wFn, minClear, minClear + 55);
+      if (!s) continue;
+      const scale = 0.7 + Math.random() * 1.6;
+      dummy.position.set(s.x, s.y, s.z);
+      dummy.scale.set(scale, scale, scale);
+      dummy.rotation.y = Math.random() * Math.PI * 2;
+      dummy.updateMatrix();
+      trunkMesh.setMatrixAt(placed, dummy.matrix);
+
+      dummy.position.set(s.x, s.y + 2.0 * scale, s.z);
+      dummy.scale.set(scale, scale, scale);
+      dummy.updateMatrix();
+      leafMesh.setMatrixAt(placed, dummy.matrix);
+
+      if (snowMesh) {
+        dummy.position.set(s.x, s.y + 3.2 * scale, s.z);
+        dummy.scale.set(scale * 0.9, scale * 0.5, scale * 0.9);
+        dummy.updateMatrix();
+        snowMesh.setMatrixAt(placed, dummy.matrix);
+        dummy.position.set(s.x, s.y + 3.8 * scale, s.z);
+        dummy.scale.set(scale * 0.5, scale * 0.35, scale * 0.5);
+        dummy.updateMatrix();
+        snowMesh2.setMatrixAt(placed, dummy.matrix);
+      }
+      placed++;
+    }
+    trunkMesh.count = placed;
+    leafMesh.count = placed;
+    trunkMesh.instanceMatrix.needsUpdate = true;
+    leafMesh.instanceMatrix.needsUpdate = true;
+    trunkMesh.castShadow = leafMesh.castShadow = true;
+    scene.add(trunkMesh, leafMesh);
+    if (snowMesh) {
+      snowMesh.count = placed;
+      snowMesh2.count = placed;
+      snowMesh.instanceMatrix.needsUpdate = true;
+      snowMesh2.instanceMatrix.needsUpdate = true;
+      scene.add(snowMesh, snowMesh2);
+    }
+  } else if (scn.treeType === 'cactus') {
+    const bodyGeo = new THREE.CylinderGeometry(0.25, 0.3, 2.5, 8);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2d7a3a, roughness: 0.8 });
+    const bodyMesh = new THREE.InstancedMesh(bodyGeo, bodyMat, count);
+    const armGeo = new THREE.CylinderGeometry(0.12, 0.14, 1.0, 6);
+    const armMesh = new THREE.InstancedMesh(armGeo, bodyMat, count * 2);
+    const dummy = new THREE.Object3D();
+    let placed = 0;
+    let armIdx = 0;
+    let attempts = 0;
+    while (placed < count && attempts < count * 20) {
+      attempts++;
+      const s = sampleOutside(curve, scn, wFn, minClear, minClear + 60);
+      if (!s) continue;
+      const scale = 0.7 + Math.random() * 1.5;
+      dummy.position.set(s.x, s.y + 1.25 * scale, s.z);
+      dummy.scale.set(scale, scale, scale);
+      dummy.rotation.set(0, Math.random() * Math.PI, 0);
+      dummy.updateMatrix();
+      bodyMesh.setMatrixAt(placed, dummy.matrix);
+
+      const arms = Math.floor(Math.random() * 3);
+      for (let a = 0; a < arms && armIdx < count * 2; a++) {
+        dummy.position.set(
+          s.x + (a === 0 ? 0.4 : -0.4) * scale,
+          s.y + (1.5 + a * 0.3) * scale,
+          s.z
+        );
+        dummy.scale.set(scale * 0.8, scale * 0.6, scale * 0.8);
+        dummy.rotation.z = (a === 0 ? 1 : -1) * 0.6;
+        dummy.updateMatrix();
+        armMesh.setMatrixAt(armIdx++, dummy.matrix);
+      }
+      placed++;
+    }
+    bodyMesh.count = placed;
+    bodyMesh.instanceMatrix.needsUpdate = true;
+    armMesh.count = armIdx;
+    armMesh.instanceMatrix.needsUpdate = true;
+    bodyMesh.castShadow = true;
+    scene.add(bodyMesh, armMesh);
   }
-  tMesh.count = placed; tMesh.instanceMatrix.needsUpdate = true;
-  if (lMesh) { lMesh.count = placed; lMesh.instanceMatrix.needsUpdate = true; }
-  if (armMesh) { armMesh.count = armPlaced; armMesh.instanceMatrix.needsUpdate = true; }
-  if (capMesh) { capMesh.count = placed; capMesh.instanceMatrix.needsUpdate = true; }
-  if (capMesh2) { capMesh2.count = placed; capMesh2.instanceMatrix.needsUpdate = true; }
 }
 
 function placeLamps(scn, curve, wFn) {
-  const spacing = scn.lampSpacing ?? 35;
-  const pG = new THREE.CylinderGeometry(0.1, 0.16, 7.5, 8);
-  const pM = new THREE.MeshStandardMaterial({ color: 0x555, roughness: 0.5, metalness: 0.85 });
-  const armG = new THREE.BoxGeometry(1.5, 0.1, 0.1);
-  const bG = new THREE.SphereGeometry(0.28, 10, 10);
-  const bM = new THREE.MeshStandardMaterial({ color: 0xffffcc, emissive: 0xffffaa, emissiveIntensity: 1.3 });
-  const pCount = Math.floor(trackLength / spacing);
-  for (let i = 0; i < pCount; i++) {
-    const t = i / pCount;
-    const p = curve.getPointAt(t);
-    const tan = curve.getTangentAt(t);
-    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
-    for (let side = -1; side <= 1; side += 2) {
-      const pp = p.clone().addScaledVector(n, side * (trackWidth / 2 + 2.8));
-      const pole = new THREE.Mesh(pG, pM);
-      pole.position.set(pp.x, p.y + 3.7, pp.z);
-      pole.castShadow = true; scene.add(pole);
-      const arm = new THREE.Mesh(armG, pM);
-      arm.position.set(pp.x - n.x * side * 0.75, p.y + 7.2, pp.z - n.z * side * 0.75);
-      arm.rotation.y = Math.atan2(n.x, n.z);
-      arm.castShadow = true; scene.add(arm);
-      const bulb = new THREE.Mesh(bG, bM);
-      bulb.position.set(pp.x - n.x * side * 1.5, p.y + 7.2, pp.z - n.z * side * 1.5);
-      scene.add(bulb);
-      const pl = new THREE.PointLight(0xffeecc, 0.6, 20, 2);
-      pl.position.copy(bulb.position);
-      scene.add(pl);
+  const scene = getScene();
+  const spacing = scn.lampSpacing || 32;
+  const length = curve.getLength();
+  const count = Math.floor(length / spacing);
+  const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, 3.5, 6);
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x333340, metalness: 0.7 });
+  const armGeo = new THREE.BoxGeometry(1.2, 0.08, 0.08);
+  const bulbGeo = new THREE.SphereGeometry(0.2, 8, 8);
+  const bulbMat = new THREE.MeshStandardMaterial({
+    color: 0xffeeaa,
+    emissive: 0xffdd88,
+    emissiveIntensity: 1.5,
+  });
+
+  for (let i = 0; i < count; i++) {
+    const t = i / count;
+    const side = i % 2 === 0 ? 1 : -1;
+    // Lamps sit just outside the ribbon edge
+    const s = sampleOutside(curve, scn, wFn, 1.5, 2.5, { t, side, maxAttempts: 8, avoidStart: 20 });
+    if (!s) continue;
+
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.set(s.x, s.y + 1.75, s.z);
+    pole.castShadow = true;
+    scene.add(pole);
+
+    // Arm points toward the track (inward = -side * normal)
+    const inwardX = -s.nx * s.side;
+    const inwardZ = -s.nz * s.side;
+    const arm = new THREE.Mesh(armGeo, poleMat);
+    arm.position.set(s.x + inwardX * 0.7, s.y + 3.4, s.z + inwardZ * 0.7);
+    scene.add(arm);
+
+    const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+    bulb.position.set(s.x + inwardX * 1.3, s.y + 3.2, s.z + inwardZ * 1.3);
+    scene.add(bulb);
+
+    if (i % 3 === 0) {
+      const light = new THREE.PointLight(0xffeeaa, 0.5, 18, 2);
+      light.position.copy(bulb.position);
+      scene.add(light);
     }
   }
 }
 
 function placeCones(scn, curve, wFn) {
-  const every = scn.conesEvery ?? 16;
-  const cG = new THREE.ConeGeometry(0.24, 0.7, 10);
-  const cM = new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.55 });
-  const sG = new THREE.CylinderGeometry(0.2, 0.22, 0.12, 10);
-  const sM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
-  const cCount = Math.floor(trackLength / every);
-  for (let i = 0; i < cCount; i++) {
-    const t = i / cCount;
-    const p = curve.getPointAt(t);
-    const tan = curve.getTangentAt(t);
-    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+  const scene = getScene();
+  const every = scn.conesEvery || 16;
+  const length = curve.getLength();
+  const count = Math.floor(length / every);
+  const coneGeo = new THREE.ConeGeometry(0.25, 0.7, 8);
+  const coneMat = new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.6 });
+  const stripeGeo = new THREE.CylinderGeometry(0.22, 0.26, 0.1, 8);
+  const stripeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+
+  for (let i = 0; i < count; i++) {
+    const t = i / count;
     const side = i % 2 === 0 ? 1 : -1;
-    const w = wFn ? (trackWidth / 2 + 1.4) * wFn(t) : trackWidth / 2 + 1.4;
-    const cp = p.clone().addScaledVector(n, side * w);
-    const cone = new THREE.Mesh(cG, cM);
-    cone.position.set(cp.x, p.y + 0.4, cp.z);
-    cone.castShadow = true; scene.add(cone);
-    const stripe = new THREE.Mesh(sG, sM);
-    stripe.position.set(cp.x, p.y + 0.45, cp.z);
+    // On the shoulder, just outside asphalt
+    const s = sampleOutside(curve, scn, wFn, 0.6, 1.2, { t, side, maxAttempts: 6, avoidStart: 12 });
+    if (!s) continue;
+    const cone = new THREE.Mesh(coneGeo, coneMat);
+    cone.position.set(s.x, s.y + 0.35, s.z);
+    cone.castShadow = true;
+    scene.add(cone);
+    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+    stripe.position.set(s.x, s.y + 0.35, s.z);
     scene.add(stripe);
   }
 }
 
 function placeRocks(scn, curve, wFn) {
-  const rCount = scn.rockCount ?? 100;
-  const rG = new THREE.DodecahedronGeometry(0.5, 0);
-  const rM = new THREE.MeshStandardMaterial({ color: scn.rockColor || 0x7a7a7a, roughness: 0.95 });
-  for (let i = 0; i < rCount; i++) {
-    const t = Math.random();
-    const p = curve.getPointAt(t);
-    const tan = curve.getTangentAt(t);
-    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
-    const side = Math.random() > 0.5 ? 1 : -1;
-    const base = wFn ? (trackWidth / 2 + 2) * wFn(t) : trackWidth / 2 + 2;
-    const dist = base + Math.random() * 8;
-    const rp = p.clone().addScaledVector(n, side * dist);
-    const rock = new THREE.Mesh(rG, rM);
-    const s = 0.4 + Math.random() * 2;
-    rock.position.set(rp.x, p.y + s * 0.18 - 0.35, rp.z);
-    rock.scale.set(s, s * 0.7, s);
-    rock.rotation.set(Math.random(), Math.random(), Math.random());
-    rock.castShadow = true; scene.add(rock);
+  const scene = getScene();
+  const count = scn.rockCount || 100;
+  const geo = new THREE.DodecahedronGeometry(1, 0);
+  const mat = new THREE.MeshStandardMaterial({
+    color: scn.rockColor || 0x6a6a6a,
+    roughness: 0.95,
+  });
+  const mesh = new THREE.InstancedMesh(geo, mat, count);
+  const dummy = new THREE.Object3D();
+  const minClear = scn.trackWidth / 2 + 5;
+  let placed = 0;
+  let attempts = 0;
+  while (placed < count && attempts < count * 20) {
+    attempts++;
+    const s = sampleOutside(curve, scn, wFn, minClear, minClear + 45);
+    if (!s) continue;
+    const scale = 0.4 + Math.random() * 2.0;
+    // Extra reject if rock radius would reach asphalt
+    if (s.clear < scale + 1.5) continue;
+    dummy.position.set(s.x, s.y - 0.1, s.z);
+    dummy.scale.set(scale, scale * 0.7, scale);
+    dummy.rotation.set(Math.random(), Math.random(), Math.random());
+    dummy.updateMatrix();
+    mesh.setMatrixAt(placed++, dummy.matrix);
   }
+  mesh.count = placed;
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
 }
 
-function addFlowers(curve, bound, wFn) {
-  const colors = [0xff3366, 0xffffff, 0xffeb3b, 0xe91e63, 0xba68c8];
-  for (let c = 0; c < 5; c++) {
-    const geo = new THREE.IcosahedronGeometry(0.18, 0);
-    const mat = new THREE.MeshStandardMaterial({ color: colors[c % colors.length], roughness: 0.7 });
-    const count = 60;
-    const im = new THREE.InstancedMesh(geo, mat, count);
-    const d = new THREE.Object3D();
-    for (let i = 0; i < count; i++) {
-      let tries = 0;
-      while (tries < 20) {
-        tries++;
-        const x = bound.minX + Math.random() * (bound.maxX - bound.minX);
-        const z = bound.minZ + Math.random() * (bound.maxZ - bound.minZ);
-        const nr = nearestOnCurve(curve, new THREE.Vector3(x, 0, z));
-        if (nr.dist > 10 && nr.dist < 40) {
-          d.position.set(x, 0.1, z);
-          d.scale.setScalar(0.5 + Math.random() * 0.7);
-          d.updateMatrix(); im.setMatrixAt(i, d.matrix); break;
-        }
-      }
+function addFlowers(curve, scn, wFn) {
+  const scene = getScene();
+  const colors = [0xff4488, 0xffee44, 0xff8844, 0x4488ff, 0xee44ff];
+  const minClear = scn.trackWidth / 2 + 4;
+  for (const col of colors) {
+    const geo = new THREE.IcosahedronGeometry(0.15, 0);
+    const mat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.6 });
+    const mesh = new THREE.InstancedMesh(geo, mat, 60);
+    const dummy = new THREE.Object3D();
+    let placed = 0;
+    for (let i = 0; i < 120 && placed < 60; i++) {
+      const s = sampleOutside(curve, scn, wFn, minClear, minClear + 30, { maxAttempts: 6 });
+      if (!s) continue;
+      dummy.position.set(s.x, s.y + 0.15, s.z);
+      dummy.scale.setScalar(0.5 + Math.random());
+      dummy.updateMatrix();
+      mesh.setMatrixAt(placed++, dummy.matrix);
     }
-    im.instanceMatrix.needsUpdate = true;
-    scene.add(im);
+    mesh.count = placed;
+    mesh.instanceMatrix.needsUpdate = true;
+    scene.add(mesh);
   }
 }
 
-function addSheds(curve, bound, wFn) {
-  const shedCount = 5;
-  for (let i = 0; i < shedCount; i++) {
-    const t = (i + 0.4) / shedCount;
-    const p = curve.getPointAt(t);
-    const tan = curve.getTangentAt(t);
-    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+function addSheds(curve, scn, wFn) {
+  const scene = getScene();
+  const minClear = scn.trackWidth / 2 + 14;
+  for (let i = 0; i < 5; i++) {
+    const t = (i + 0.5) / 5;
     const side = i % 2 === 0 ? 1 : -1;
-    const dist = 25 + Math.random() * 20;
-    const pos = p.clone().addScaledVector(n, side * dist);
-    const group = new THREE.Group();
+    const s = sampleOutside(curve, scn, wFn, minClear, minClear + 18, {
+      t, side, maxAttempts: 20, avoidStart: 40,
+    });
+    if (!s) continue;
+    const g = new THREE.Group();
     const body = new THREE.Mesh(
-      new THREE.BoxGeometry(3, 2, 2.5),
-      new THREE.MeshStandardMaterial({ color: 0x8a5a30, roughness: 0.9 })
+      new THREE.BoxGeometry(4, 2.5, 5),
+      new THREE.MeshStandardMaterial({ color: 0x8b6914, roughness: 0.9 })
     );
-    body.position.y = 0.55; body.castShadow = true; group.add(body);
+    body.position.y = 1.25;
+    g.add(body);
     const roof = new THREE.Mesh(
-      new THREE.ConeGeometry(2.8, 1.5, 4),
-      new THREE.MeshStandardMaterial({ color: 0x6b2e20, roughness: 0.8 })
+      new THREE.ConeGeometry(3.5, 1.5, 4),
+      new THREE.MeshStandardMaterial({ color: 0x6b3410, roughness: 0.85 })
     );
-    roof.position.y = 2.25; roof.rotation.y = Math.PI / 4; roof.castShadow = true; group.add(roof);
+    roof.position.y = 3.2;
+    roof.rotation.y = Math.PI / 4;
+    g.add(roof);
     const door = new THREE.Mesh(
-      new THREE.BoxGeometry(0.7, 1.2, 0.1),
-      new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 0.9 })
+      new THREE.BoxGeometry(1, 1.8, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0x3a2010 })
     );
-    door.position.set(0, 0.6, 1.26); group.add(door);
-    group.position.set(pos.x, p.y, pos.z);
-    group.rotation.y = Math.random() * Math.PI * 2;
-    group.castShadow = true; scene.add(group);
+    door.position.set(0, 0.9, 2.55);
+    g.add(door);
+    g.position.set(s.x, s.y, s.z);
+    g.rotation.y = Math.atan2(s.tan.x, s.tan.z);
+    scene.add(g);
   }
 }
 
-function addSigns(curve) {
-  const signCount = 8;
-  for (let i = 0; i < signCount; i++) {
-    const t = (i + 0.2) / signCount;
-    const p = curve.getPointAt(t);
+function addSigns(curve, scn, wFn) {
+  const scene = getScene();
+  for (let i = 0; i < 8; i++) {
+    const t = (i + 0.3) / 8;
     const tan = curve.getTangentAt(t);
-    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
-    const ahead = curve.getPointAt(Math.min(1, t + 0.03));
-    const toAhead = new THREE.Vector3().subVectors(ahead, p);
-    const cross = tan.x * toAhead.z - tan.z * toAhead.x;
-    const side = cross > 0 ? 1 : -1;
-    const pos = p.clone().addScaledVector(n, side * (trackWidth / 2 + 3));
-    const group = new THREE.Group();
+    const t2 = (t + 0.05) % 1;
+    const tan2 = curve.getTangentAt(t2);
+    const cross = tan.x * tan2.z - tan.z * tan2.x;
+    const isRight = cross < 0;
+    const side = 1;
+    const s = sampleOutside(curve, scn, wFn, 2.5, 4, { t, side, maxAttempts: 10, avoidStart: 15 });
+    if (!s) continue;
+
     const post = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.08, 0.08, 2.2, 6),
-      new THREE.MeshStandardMaterial({ color: 0x555, metalness: 0.7, roughness: 0.4 })
+      new THREE.CylinderGeometry(0.05, 0.05, 1.5, 6),
+      new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.5 })
     );
-    post.position.y = 1.1; post.castShadow = true; group.add(post);
+    post.position.set(s.x, s.y + 0.75, s.z);
+    scene.add(post);
+
     const board = new THREE.Mesh(
-      new THREE.BoxGeometry(1.4, 0.9, 0.1),
-      new THREE.MeshStandardMaterial({ color: side > 0 ? 0x1565c0 : 0xc62828, roughness: 0.5 })
+      new THREE.BoxGeometry(1.0, 0.8, 0.08),
+      new THREE.MeshStandardMaterial({
+        color: isRight ? 0x2266cc : 0xcc2222,
+        roughness: 0.5,
+      })
     );
-    board.position.y = 2.2; board.castShadow = true; group.add(board);
-    const arrow = new THREE.Mesh(
-      new THREE.ConeGeometry(0.22, 0.35, 3),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 })
-    );
-    arrow.position.set(0, 2.2, 0.08);
-    arrow.rotation.z = side > 0 ? -Math.PI / 2 : Math.PI / 2;
-    group.add(arrow);
-    group.position.set(pos.x, p.y, pos.z);
-    group.lookAt(p.x, p.y, p.z);
-    scene.add(group);
+    board.position.set(s.x, s.y + 1.3, s.z);
+    const p = curve.getPointAt(t);
+    board.lookAt(p.x, s.y + 1.3, p.z);
+    scene.add(board);
   }
 }
 
-function addBroadleafTrees(curve, bound) {
-  const tG = new THREE.CylinderGeometry(0.25, 0.4, 2.2, 6);
-  const tM = new THREE.MeshStandardMaterial({ color: 0x5a3a20, roughness: 0.95 });
-  const lG = new THREE.IcosahedronGeometry(1.6, 1);
-  const lM = new THREE.MeshStandardMaterial({ color: 0x3a8a2a, roughness: 0.85 });
-  const count = 60;
-  const iT = new THREE.InstancedMesh(tG, tM, count);
-  const iL = new THREE.InstancedMesh(lG, lM, count * 2);
-  scene.add(iT); scene.add(iL);
-  const d = new THREE.Object3D();
-  let tp = 0, lp = 0;
-  for (let i = 0; i < count; i++) {
-    let tries = 0;
-    while (tries < 20) {
-      tries++;
-      const x = bound.minX + Math.random() * (bound.maxX - bound.minX);
-      const z = bound.minZ + Math.random() * (bound.maxZ - bound.minZ);
-      const nr = nearestOnCurve(curve, new THREE.Vector3(x, 0, z));
-      if (nr.dist > 20 && nr.dist < 80) {
-        const s = 0.8 + Math.random() * 1.1;
-        d.position.set(x, 1.1 * s, z); d.scale.set(s, s, s); d.rotation.y = Math.random() * Math.PI * 2;
-        d.updateMatrix(); iT.setMatrixAt(tp++, d.matrix);
-        for (let k = 0; k < 2; k++) {
-          d.position.set(x + (Math.random() - 0.5) * 1.2, 2.2 * s + Math.random() * 0.5, z + (Math.random() - 0.5) * 1.2);
-          d.scale.set(s * (0.8 + Math.random() * 0.4), s * (0.8 + Math.random() * 0.4), s * (0.8 + Math.random() * 0.4));
-          d.updateMatrix(); if (lp < count * 2) { iL.setMatrixAt(lp++, d.matrix); }
-        }
-        break;
-      }
+function addBroadleafTrees(curve, scn, wFn) {
+  const scene = getScene();
+  const trunkGeo = new THREE.CylinderGeometry(0.2, 0.3, 3, 6);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3a20, roughness: 0.9 });
+  const leafGeo = new THREE.IcosahedronGeometry(1.8, 1);
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x3a8a3a, roughness: 0.85 });
+  const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, 60);
+  const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, 120);
+  const dummy = new THREE.Object3D();
+  const minClear = scn.trackWidth / 2 + 10;
+  let placed = 0;
+  for (let i = 0; i < 150 && placed < 60; i++) {
+    const s = sampleOutside(curve, scn, wFn, minClear, minClear + 40, { maxAttempts: 6 });
+    if (!s) continue;
+    const scale = 0.8 + Math.random() * 1.2;
+    dummy.position.set(s.x, s.y + 1.5 * scale, s.z);
+    dummy.scale.set(scale, scale, scale);
+    dummy.updateMatrix();
+    trunkMesh.setMatrixAt(placed, dummy.matrix);
+    for (let j = 0; j < 2; j++) {
+      dummy.position.set(s.x + (j - 0.5) * 0.5, s.y + (3.5 + j * 0.8) * scale, s.z);
+      dummy.scale.setScalar(scale * (1.0 - j * 0.2));
+      dummy.updateMatrix();
+      leafMesh.setMatrixAt(placed * 2 + j, dummy.matrix);
     }
+    placed++;
   }
-  iT.count = tp; iL.count = lp;
-  iT.instanceMatrix.needsUpdate = true; iL.instanceMatrix.needsUpdate = true;
+  trunkMesh.count = placed;
+  leafMesh.count = placed * 2;
+  trunkMesh.instanceMatrix.needsUpdate = true;
+  leafMesh.instanceMatrix.needsUpdate = true;
+  trunkMesh.castShadow = leafMesh.castShadow = true;
+  scene.add(trunkMesh, leafMesh);
 }
 
-function addDunes(curve, wFn) {
-  const dM = new THREE.MeshStandardMaterial({ color: 0xc8923a, roughness: 1 });
-  const minDist = trackWidth / 2 + 12;
-  for (let i = 0; i < 38; i++) {
-    const t = Math.random(); const p = curve.getPointAt(t);
-    const nr = nearestOnCurve(curve, p);
-    if (nr.dist < minDist) continue;
-    const tan = curve.getTangentAt(t);
-    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
-    const side = Math.random() > 0.5 ? 1 : -1;
-    const dist = 38 + Math.random() * 75;
-    const dp = p.clone().addScaledVector(n, side * dist);
-    const dpNr = nearestOnCurve(curve, dp);
-    if (dpNr.dist < minDist) continue;
-    const dune = new THREE.Mesh(
-      new THREE.SphereGeometry(9 + Math.random() * 11, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), dM);
-    dune.position.set(dp.x, p.y - 3.2, dp.z);
-    dune.scale.y = 0.28 + Math.random() * 0.22;
-    dune.receiveShadow = true; scene.add(dune);
+function addDunes(curve, scn, wFn) {
+  const scene = getScene();
+  const count = 38;
+  const geo = new THREE.SphereGeometry(1, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xd8a865, roughness: 0.95 });
+  let placed = 0;
+  for (let i = 0; i < count * 4 && placed < count; i++) {
+    const s = sampleOutside(curve, scn, wFn, 22, 80, { maxAttempts: 8 });
+    if (!s) continue;
+    const scale = 6 + Math.random() * 14;
+    // Dune radius (xz) must stay off track
+    if (s.clear < scale * 0.7) continue;
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(s.x, s.y - 0.5, s.z);
+    m.scale.set(scale, scale * (0.28 + Math.random() * 0.22), scale);
+    m.receiveShadow = true;
+    scene.add(m);
+    placed++;
   }
 }
 
-function addCanyon(curve, wFn) {
-  const canyonT = 0.38;
-  const p = curve.getPointAt(canyonT);
-  const tan = curve.getTangentAt(canyonT).normalize();
-  const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0x8a5a28, roughness: 0.95 });
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0x6a4020, roughness: 0.9 });
+function addCanyon(curve, scn, wFn) {
+  const scene = getScene();
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0xa06838, roughness: 0.9 });
+
+  // Two canyon walls well outside the track at t≈0.35
   for (let side = -1; side <= 1; side += 2) {
-    const wallGroup = new THREE.Group();
-    const mainWall = new THREE.Mesh(new THREE.BoxGeometry(18, 22, 28), wallMat);
-    mainWall.position.set(0, 10, 0);
-    mainWall.castShadow = true; mainWall.receiveShadow = true; wallGroup.add(mainWall);
-    const topRock = new THREE.Mesh(new THREE.DodecahedronGeometry(6, 1), rockMat);
-    topRock.position.set(0, 22, 0);
-    topRock.scale.set(1.2, 0.7, 1.0); topRock.castShadow = true; wallGroup.add(topRock);
-    for (let i = 0; i < 8; i++) {
-      const boulder = new THREE.Mesh(new THREE.DodecahedronGeometry(1.5 + Math.random() * 2.5, 0), rockMat);
-      boulder.position.set((Math.random() - 0.5) * 16, Math.random() * 8, (Math.random() - 0.5) * 24);
-      boulder.rotation.set(Math.random(), Math.random(), Math.random());
-      boulder.castShadow = true; wallGroup.add(boulder);
-    }
-    const wallPos = p.clone().addScaledVector(n, side * (trackWidth / 2 + 10));
-    wallGroup.position.set(wallPos.x, p.y - 1, wallPos.z);
-    wallGroup.rotation.y = Math.atan2(tan.x, tan.z);
-    scene.add(wallGroup);
-  }
-  const archGeo = new THREE.TorusGeometry(trackWidth / 2 + 2, 1.5, 8, 12, Math.PI);
-  const archMat = new THREE.MeshStandardMaterial({ color: 0x7a4a22, roughness: 0.9 });
-  const arch = new THREE.Mesh(archGeo, archMat);
-  arch.position.set(p.x, p.y + 14, p.z);
-  arch.rotation.y = Math.atan2(tan.x, tan.z);
-  arch.rotation.z = Math.PI;
-  arch.castShadow = true; scene.add(arch);
-  const cliffMat = new THREE.MeshStandardMaterial({ color: 0x9a6a38, roughness: 0.95 });
-  for (let i = 0; i < 12; i++) {
-    const t2 = canyonT + (i - 6) * 0.008;
-    const p2 = curve.getPointAt(Math.max(0.01, Math.min(0.99, t2)));
-    const tan2 = curve.getTangentAt(Math.max(0.01, Math.min(0.99, t2)));
-    const n2 = new THREE.Vector3(-tan2.z, 0, tan2.x).normalize();
-    for (let side = -1; side <= 1; side += 2) {
-      const cliff = new THREE.Mesh(new THREE.DodecahedronGeometry(2 + Math.random() * 3, 0), cliffMat);
-      const dist = trackWidth / 2 + 3 + Math.random() * 5;
-      const cp = p2.clone().addScaledVector(n2, side * dist);
-      cliff.position.set(cp.x, p2.y + Math.random() * 4, cp.z);
-      cliff.rotation.set(Math.random(), Math.random(), Math.random());
-      cliff.scale.set(1, 0.6 + Math.random() * 0.8, 1);
-      cliff.castShadow = true; scene.add(cliff);
+    const s = sampleOutside(curve, scn, wFn, 28, 36, {
+      t: 0.35, side, maxAttempts: 12, avoidStart: 20,
+    });
+    if (!s) continue;
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(18, 22, 28), rockMat);
+    wall.position.set(s.x, s.y + 8, s.z);
+    wall.castShadow = true;
+    scene.add(wall);
+    const top = new THREE.Mesh(new THREE.DodecahedronGeometry(6, 0), rockMat);
+    top.position.set(s.x, s.y + 20, s.z);
+    scene.add(top);
+    for (let b = 0; b < 8; b++) {
+      const boulder = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(1.5 + Math.random(), 0),
+        rockMat
+      );
+      const bx = s.x + (Math.random() - 0.5) * 16;
+      const bz = s.z + (Math.random() - 0.5) * 16;
+      if (clearanceFromTrack(curve, bx, bz, scn.trackWidth, wFn) < 8) continue;
+      boulder.position.set(bx, s.y + Math.random() * 5, bz);
+      scene.add(boulder);
     }
   }
-}
 
-function addBarrels(curve, wFn) {
-  const bG = new THREE.CylinderGeometry(0.35, 0.4, 0.9, 10);
-  const bM = new THREE.MeshStandardMaterial({ color: 0xb04020, roughness: 0.5, metalness: 0.3 });
-  const ringG = new THREE.TorusGeometry(0.38, 0.03, 6, 12);
-  const ringM = new THREE.MeshStandardMaterial({ color: 0x888, metalness: 0.7, roughness: 0.3 });
-  const count = 25;
-  for (let i = 0; i < count; i++) {
-    const t = Math.random(); const p = curve.getPointAt(t);
-    const tan = curve.getTangentAt(t);
-    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
-    const side = Math.random() > 0.5 ? 1 : -1;
-    const base = wFn ? (trackWidth / 2 + 2) * wFn(t) : trackWidth / 2 + 2;
-    const dist = base + 2 + Math.random() * 4;
-    const bp = p.clone().addScaledVector(n, side * dist);
-    const barrel = new THREE.Mesh(bG, bM);
-    barrel.position.set(bp.x, p.y + 0.5, bp.z);
-    barrel.rotation.z = (Math.random() - 0.5) * 0.3;
-    barrel.castShadow = true; scene.add(barrel);
-    for (let r = 0; r < 2; r++) {
-      const ring = new THREE.Mesh(ringG, ringM);
-      ring.position.set(bp.x, p.y + 0.2 + r * 0.5, bp.z);
-      ring.rotation.x = Math.PI / 2; scene.add(ring);
-    }
+  // Decorative rock arch OFF the racing line (beside track, not over it)
+  const archS = sampleOutside(curve, scn, wFn, 18, 26, {
+    t: 0.55, side: 1, maxAttempts: 12, avoidStart: 25,
+  });
+  if (archS) {
+    const arch = new THREE.Mesh(
+      new THREE.TorusGeometry(8, 1.6, 8, 16, Math.PI),
+      rockMat
+    );
+    arch.position.set(archS.x, archS.y + 1.5, archS.z);
+    arch.rotation.x = Math.PI / 2;
+    arch.rotation.z = Math.atan2(archS.tan.x, archS.tan.z);
+    scene.add(arch);
+  }
+
+  // Cliffs far from asphalt
+  let cliffs = 0;
+  for (let i = 0; i < 40 && cliffs < 12; i++) {
+    const s = sampleOutside(curve, scn, wFn, 24, 50, { maxAttempts: 6 });
+    if (!s) continue;
+    const sx = 8 + Math.random() * 10;
+    const sz = 6 + Math.random() * 8;
+    if (s.clear < Math.max(sx, sz) * 0.6) continue;
+    const cliff = new THREE.Mesh(
+      new THREE.BoxGeometry(sx, 10 + Math.random() * 15, sz),
+      rockMat
+    );
+    cliff.position.set(s.x, s.y + 5, s.z);
+    cliff.rotation.y = Math.random() * Math.PI;
+    scene.add(cliff);
+    cliffs++;
   }
 }
 
-function addTumbleweeds(curve, bound, wFn) {
-  const g = new THREE.IcosahedronGeometry(0.4, 0);
-  const m = new THREE.MeshStandardMaterial({ color: 0x8a6a38, wireframe: true, roughness: 1 });
-  const count = 20;
-  for (let i = 0; i < count; i++) {
-    const t = Math.random(); const p = curve.getPointAt(t);
-    const tan = curve.getTangentAt(t);
-    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
-    const side = Math.random() > 0.5 ? 1 : -1;
-    const base = wFn ? (trackWidth / 2 + 2) * wFn(t) : trackWidth / 2 + 2;
-    const dist = base + 3 + Math.random() * 8;
-    const pp = p.clone().addScaledVector(n, side * dist);
-    const tw = new THREE.Mesh(g, m);
-    tw.position.set(pp.x, p.y + 0.4, pp.z);
-    tw.castShadow = true; scene.add(tw);
+function addBarrels(curve, scn, wFn) {
+  const scene = getScene();
+  const bodyGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.0, 12);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xaa2222, metalness: 0.4, roughness: 0.5 });
+  const ringGeo = new THREE.TorusGeometry(0.42, 0.04, 6, 12);
+  const ringMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.7 });
+  let placed = 0;
+  for (let i = 0; i < 80 && placed < 25; i++) {
+    const s = sampleOutside(curve, scn, wFn, 3, 14, { maxAttempts: 6, avoidStart: 18 });
+    if (!s) continue;
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(bodyGeo, bodyMat));
+    const r1 = new THREE.Mesh(ringGeo, ringMat);
+    r1.rotation.x = Math.PI / 2;
+    r1.position.y = 0.3;
+    g.add(r1);
+    const r2 = r1.clone();
+    r2.position.y = -0.3;
+    g.add(r2);
+    g.position.set(s.x, s.y + 0.5, s.z);
+    g.rotation.y = Math.random() * Math.PI;
+    scene.add(g);
+    placed++;
   }
 }
 
-function addSnowPiles(curve, wFn) {
-  const count = 50;
-  const g = new THREE.SphereGeometry(1, 10, 8);
-  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
-  for (let i = 0; i < count; i++) {
-    const t = Math.random(); const p = curve.getPointAt(t);
-    const tan = curve.getTangentAt(t);
-    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
-    const side = Math.random() > 0.5 ? 1 : -1;
-    const base = wFn ? (trackWidth / 2 + 1) * wFn(t) : trackWidth / 2 + 1;
-    const dist = base + Math.random() * 6;
-    const pp = p.clone().addScaledVector(n, side * dist);
-    const s = 0.6 + Math.random() * 1.4;
-    const pile = new THREE.Mesh(g, m);
-    pile.position.set(pp.x, p.y + s * 0.4 - 0.1, pp.z);
-    pile.scale.set(s * 1.2, s * 0.6, s * 1.2);
-    pile.castShadow = true; pile.receiveShadow = true; scene.add(pile);
+function addTumbleweeds(curve, scn, wFn) {
+  const scene = getScene();
+  const geo = new THREE.IcosahedronGeometry(0.8, 1);
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x8b6914,
+    wireframe: true,
+    roughness: 0.9,
+  });
+  let placed = 0;
+  for (let i = 0; i < 50 && placed < 20; i++) {
+    const s = sampleOutside(curve, scn, wFn, 4, 22, { maxAttempts: 6 });
+    if (!s) continue;
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(s.x, s.y + 0.8, s.z);
+    m.scale.setScalar(0.6 + Math.random() * 0.8);
+    scene.add(m);
+    placed++;
   }
 }
 
-function addSnowmen(curve, wFn) {
-  const count = 6;
-  for (let i = 0; i < count; i++) {
-    const t = (i + 0.3) / count; const p = curve.getPointAt(t);
-    const tan = curve.getTangentAt(t);
-    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+function addSnowPiles(curve, scn, wFn) {
+  const scene = getScene();
+  const geo = new THREE.SphereGeometry(1, 10, 8);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xf0f4f8, roughness: 0.9 });
+  let placed = 0;
+  for (let i = 0; i < 120 && placed < 50; i++) {
+    const s = sampleOutside(curve, scn, wFn, 3, 16, { maxAttempts: 6 });
+    if (!s) continue;
+    const scale = 1 + Math.random() * 3;
+    if (s.clear < scale * 0.6) continue;
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(s.x, s.y + 0.1, s.z);
+    m.scale.set(scale, scale * 0.4, scale);
+    scene.add(m);
+    placed++;
+  }
+}
+
+function addSnowmen(curve, scn, wFn) {
+  const scene = getScene();
+  for (let i = 0; i < 6; i++) {
+    const t = (i + 0.5) / 6;
     const side = i % 2 === 0 ? 1 : -1;
-    const base = wFn ? (trackWidth / 2 + 2) * wFn(t) : trackWidth / 2 + 2;
-    const dist = base + 3 + Math.random() * 3;
-    const pp = p.clone().addScaledVector(n, side * dist);
-    const group = new THREE.Group();
-    const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 });
-    const black = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
-    const red = new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: 0.6 });
-    const bottom = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 10), white);
-    bottom.position.y = 0.6; bottom.castShadow = true; group.add(bottom);
-    const mid = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 10), white);
-    mid.position.y = 1.4; mid.castShadow = true; group.add(mid);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), white);
-    head.position.y = 2.05; head.castShadow = true; group.add(head);
-    for (let k = 0; k < 3; k++) {
-      const btn = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), black);
-      btn.position.set(0, 1.25 + k * 0.2, 0.4); group.add(btn);
+    const s = sampleOutside(curve, scn, wFn, 6, 12, {
+      t, side, maxAttempts: 15, avoidStart: 25,
+    });
+    if (!s) continue;
+    const g = new THREE.Group();
+    const white = new THREE.MeshStandardMaterial({ color: 0xf0f4f8, roughness: 0.9 });
+    const b1 = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 10), white);
+    b1.position.y = 0.7;
+    g.add(b1);
+    const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), white);
+    b2.position.y = 1.6;
+    g.add(b2);
+    const b3 = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 10), white);
+    b3.position.y = 2.25;
+    g.add(b3);
+    const btnMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    for (let b = 0; b < 3; b++) {
+      const btn = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), btnMat);
+      btn.position.set(0, 1.4 + b * 0.2, 0.45);
+      g.add(btn);
     }
-    const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), black); eyeL.position.set(-0.1, 2.1, 0.27); group.add(eyeL);
-    const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), black); eyeR.position.set(0.1, 2.1, 0.27); group.add(eyeR);
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.25, 8), new THREE.MeshStandardMaterial({ color: 0xff7020, roughness: 0.6 }));
-    nose.position.set(0, 2.0, 0.4); nose.rotation.x = Math.PI / 2; group.add(nose);
-    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.04, 12), black); brim.position.y = 2.35; group.add(brim);
-    const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.3, 12), black); hat.position.y = 2.52; group.add(hat);
-    const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.06, 6, 12), red); scarf.position.y = 1.72; scarf.rotation.x = Math.PI / 2; group.add(scarf);
-    group.position.set(pp.x, p.y, pp.z);
-    group.castShadow = true; scene.add(group);
+    for (let e = -1; e <= 1; e += 2) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), btnMat);
+      eye.position.set(e * 0.12, 2.35, 0.3);
+      g.add(eye);
+    }
+    const nose = new THREE.Mesh(
+      new THREE.ConeGeometry(0.06, 0.3, 6),
+      new THREE.MeshStandardMaterial({ color: 0xff6600 })
+    );
+    nose.rotation.x = Math.PI / 2;
+    nose.position.set(0, 2.25, 0.4);
+    g.add(nose);
+    const hat = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.25, 0.28, 0.35, 10),
+      new THREE.MeshStandardMaterial({ color: 0x111111 })
+    );
+    hat.position.y = 2.7;
+    g.add(hat);
+    const brim = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.4, 0.4, 0.05, 10),
+      new THREE.MeshStandardMaterial({ color: 0x111111 })
+    );
+    brim.position.y = 2.52;
+    g.add(brim);
+    const scarf = new THREE.Mesh(
+      new THREE.TorusGeometry(0.35, 0.08, 6, 12),
+      new THREE.MeshStandardMaterial({ color: 0xcc2222 })
+    );
+    scarf.position.y = 1.95;
+    scarf.rotation.x = Math.PI / 2;
+    g.add(scarf);
+
+    g.position.set(s.x, s.y, s.z);
+    scene.add(g);
   }
 }
 
-function addSnowTracks(curve, wFn) {
-  const edgeMat = new THREE.MeshStandardMaterial({ color: 0xb8c8d4, roughness: 0.8 });
-  const left = offsetCurve(curve, trackWidth / 2 + 2, false, wFn);
-  const right = offsetCurve(curve, trackWidth / 2 + 2, true, wFn);
-  const gL = buildRibbon(left, 1.2, 600);
-  const gR = buildRibbon(right, 1.2, 600);
-  const mL = new THREE.Mesh(gL, edgeMat); mL.receiveShadow = true; scene.add(mL);
-  const mR = new THREE.Mesh(gR, edgeMat); mR.receiveShadow = true; scene.add(mR);
-}
-
-function addBridge(curve, wFn) {
-  const bridgeMat = new THREE.MeshStandardMaterial({ color: 0x556677, roughness: 0.6, metalness: 0.4 });
-  const railMat = new THREE.MeshStandardMaterial({ color: 0x8899aa, roughness: 0.5, metalness: 0.6 });
-  const pillarMat = new THREE.MeshStandardMaterial({ color: 0x667788, roughness: 0.7, metalness: 0.3 });
-  const bridgeStart = 0.45, bridgeEnd = 0.6, segs = 40;
-  const pos = [], idx = [], uv = [];
-  const posTop = [], idxTop = [], uvTop = [];
-  for (let i = 0; i <= segs; i++) {
-    const t = bridgeStart + (i / segs) * (bridgeEnd - bridgeStart);
-    const p = curve.getPointAt(t);
-    const tan = curve.getTangentAt(t).normalize();
-    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
-    const w = wFn ? (trackWidth / 2 + 0.5) * wFn(t) : trackWidth / 2 + 0.5;
-    const L = p.clone().addScaledVector(n, -w);
-    const R = p.clone().addScaledVector(n, w);
-    pos.push(L.x, L.y - 0.3, L.z); pos.push(R.x, R.y - 0.3, R.z);
-    uv.push(0, (t - bridgeStart) * 200); uv.push(1, (t - bridgeStart) * 200);
-    posTop.push(L.x, L.y + 0.1, L.z); posTop.push(R.x, R.y + 0.1, R.z);
-    uvTop.push(0, (t - bridgeStart) * 200); uvTop.push(1, (t - bridgeStart) * 200);
-    if (i < segs) {
+function addSnowTracks(curve, wFn, scn) {
+  const scene = getScene();
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xc0c8d0,
+    side: THREE.DoubleSide,
+    roughness: 0.95,
+  });
+  for (let side = -1; side <= 1; side += 2) {
+    const positions = [];
+    const indices = [];
+    const segs = 400;
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const p = curve.getPointAt(t);
+      const tan = curve.getTangentAt(t);
+      let nx = -tan.z, nz = tan.x;
+      const nlen = Math.hypot(nx, nz) || 1;
+      nx /= nlen; nz /= nlen;
+      const hw = (scn.trackWidth / 2) * (wFn ? wFn(t) : 1);
+      // Just outside asphalt edge
+      const cx = p.x + nx * side * (hw + 0.55);
+      const cz = p.z + nz * side * (hw + 0.55);
+      positions.push(cx - nx * 0.35, p.y + 0.03, cz - nz * 0.35);
+      positions.push(cx + nx * 0.35, p.y + 0.03, cz + nz * 0.35);
+    }
+    for (let i = 0; i < segs; i++) {
       const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
-      idx.push(a, c, b, b, c, d); idxTop.push(a, c, b, b, c, d);
+      indices.push(a, c, b, b, c, d);
     }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    scene.add(new THREE.Mesh(geo, mat));
   }
-  const roadGeo = new THREE.BufferGeometry();
-  roadGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  roadGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  roadGeo.setIndex(idx); roadGeo.computeVertexNormals();
-  const road = new THREE.Mesh(roadGeo, bridgeMat); road.receiveShadow = true; road.castShadow = true; scene.add(road);
-  const roofGeo = new THREE.BufferGeometry();
-  roofGeo.setAttribute('position', new THREE.Float32BufferAttribute(posTop, 3));
-  roofGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvTop, 2));
-  roofGeo.setIndex(idxTop); roofGeo.computeVertexNormals();
-  const roof = new THREE.Mesh(roofGeo, bridgeMat); roof.receiveShadow = true; scene.add(roof);
-  const sideGeo = new THREE.BufferGeometry();
-  const sidePos = [], sideIdx = [], sideUv = [];
+}
+
+function addBridge(curve, scn, wFn) {
+  const scene = getScene();
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0x6b5030, roughness: 0.85 });
+  const metalMat = new THREE.MeshStandardMaterial({ color: 0x444450, metalness: 0.6, roughness: 0.4 });
+  const segs = 40;
+  // Elevated north section of the new snow oval
+  const t0 = 0.35;
+  const t1 = 0.55;
+
   for (let i = 0; i <= segs; i++) {
-    const t = bridgeStart + (i / segs) * (bridgeEnd - bridgeStart);
+    const t = t0 + (t1 - t0) * (i / segs);
     const p = curve.getPointAt(t);
-    const tan = curve.getTangentAt(t).normalize();
-    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
-    const w = wFn ? (trackWidth / 2 + 0.5) * wFn(t) : trackWidth / 2 + 0.5;
+    const tan = curve.getTangentAt(t);
+    let nx = -tan.z, nz = tan.x;
+    const nlen = Math.hypot(nx, nz) || 1;
+    nx /= nlen; nz /= nlen;
+    const half = (scn.trackWidth / 2) * (wFn ? wFn(t) : 1);
+    const w = half + 0.8;
+
     for (let side = -1; side <= 1; side += 2) {
-      const bx = p.x + n.x * side * w, bz = p.z + n.z * side * w;
-      sidePos.push(bx, p.y - 0.3, bz); sidePos.push(bx, p.y + 0.6, bz);
-      sideUv.push(0, (t - bridgeStart) * 200); sideUv.push(1, (t - bridgeStart) * 200);
-    }
-    if (i < segs) {
-      const base = i * 4;
-      sideIdx.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
-      sideIdx.push(base + 1, base + 3, base + 5, base + 5, base + 3, base + 7);
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, 1.2), metalMat);
+      rail.position.set(p.x + nx * side * w, p.y + 0.5, p.z + nz * side * w);
+      scene.add(rail);
     }
   }
-  sideGeo.setAttribute('position', new THREE.Float32BufferAttribute(sidePos, 3));
-  sideGeo.setAttribute('uv', new THREE.Float32BufferAttribute(sideUv, 2));
-  sideGeo.setIndex(sideIdx); sideGeo.computeVertexNormals();
-  const sideMesh = new THREE.Mesh(sideGeo, railMat); sideMesh.castShadow = true; scene.add(sideMesh);
-  const pillarCount = 6;
-  for (let i = 0; i <= pillarCount; i++) {
-    const t = bridgeStart + (i / pillarCount) * (bridgeEnd - bridgeStart);
+
+  for (let i = 0; i < segs; i++) {
+    const t = t0 + (t1 - t0) * (i / segs);
     const p = curve.getPointAt(t);
-    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 12, 8), pillarMat);
-    pillar.position.set(p.x, p.y - 6, p.z); pillar.castShadow = true; scene.add(pillar);
+    const roof = new THREE.Mesh(
+      new THREE.BoxGeometry(scn.trackWidth + 2.5, 0.15, 1.5),
+      woodMat
+    );
+    const tan = curve.getTangentAt(t);
+    roof.position.set(p.x, p.y + 2.8, p.z);
+    roof.lookAt(p.x + tan.x, p.y + 2.8, p.z + tan.z);
+    scene.add(roof);
+  }
+
+  // Pillars only on the OUTSIDE of the ribbon (never through asphalt)
+  for (let i = 0; i < 7; i++) {
+    const t = t0 + (t1 - t0) * (i / 6);
+    const p = curve.getPointAt(t);
+    const tan = curve.getTangentAt(t);
+    let nx = -tan.z, nz = tan.x;
+    const nlen = Math.hypot(nx, nz) || 1;
+    nx /= nlen; nz /= nlen;
+    const half = (scn.trackWidth / 2) * (wFn ? wFn(t) : 1);
+    for (let side = -1; side <= 1; side += 2) {
+      const px = p.x + nx * side * (half + 1.4);
+      const pz = p.z + nz * side * (half + 1.4);
+      if (clearanceFromTrack(curve, px, pz, scn.trackWidth, wFn) < 0.8) continue;
+      const pillarH = Math.max(p.y + 0.6, 1.8);
+      const pillar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.3, 0.4, pillarH, 8),
+        woodMat
+      );
+      pillar.position.set(px, p.y - pillarH / 2 + 0.2, pz);
+      scene.add(pillar);
+    }
   }
 }
 
-function addFrozenLakes(curve, bound) {
-  const lakeMat = new THREE.MeshStandardMaterial({ color: 0x8abed6, roughness: 0.1, metalness: 0.4, transparent: true, opacity: 0.75 });
-  for (let i = 0; i < 3; i++) {
-    const x = bound.minX + Math.random() * (bound.maxX - bound.minX);
-    const z = bound.minZ + Math.random() * (bound.maxZ - bound.minZ);
-    const nr = nearestOnCurve(curve, new THREE.Vector3(x, 0, z));
-    if (nr.dist < 40) continue;
-    const lake = new THREE.Mesh(new THREE.CircleGeometry(15 + Math.random() * 20, 24), lakeMat);
+function addFrozenLakes(curve, scn, wFn) {
+  const scene = getScene();
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x6ab0d0,
+    transparent: true,
+    opacity: 0.5,
+    roughness: 0.1,
+    metalness: 0.5,
+  });
+  let placed = 0;
+  for (let i = 0; i < 20 && placed < 3; i++) {
+    const t = (placed + 0.5) / 3;
+    const side = placed % 2 === 0 ? 1 : -1;
+    const s = sampleOutside(curve, scn, wFn, 35, 55, {
+      t, side, maxAttempts: 12, avoidStart: 40,
+    });
+    if (!s) continue;
+    const r = 12 + Math.random() * 16;
+    if (s.clear < r + 4) continue;
+    const lake = new THREE.Mesh(new THREE.CircleGeometry(r, 32), mat);
     lake.rotation.x = -Math.PI / 2;
-    lake.position.set(x, 0.02, z); lake.receiveShadow = true; scene.add(lake);
+    lake.position.set(s.x, s.y - 0.3, s.z);
+    scene.add(lake);
+    placed++;
   }
 }
 
-function createSnowParticles() {
-  if (snowParticles) return;
+export function createSnowParticles() {
+  const scene = getScene();
   const count = 3000;
-  const geo = new THREE.BufferGeometry();
-  const pos = new Float32Array(count * 3);
-  const vel = [];
+  const positions = new Float32Array(count * 3);
+  const velocities = [];
   for (let i = 0; i < count; i++) {
-    pos[i * 3] = (Math.random() - 0.5) * 400;
-    pos[i * 3 + 1] = Math.random() * 50;
-    pos[i * 3 + 2] = (Math.random() - 0.5) * 400;
-    vel.push(0.5 + Math.random() * 1.5);
+    positions[i * 3] = (Math.random() - 0.5) * 200;
+    positions[i * 3 + 1] = Math.random() * 60;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+    velocities.push({
+      vx: (Math.random() - 0.5) * 0.5,
+      vy: -(0.5 + Math.random() * 1.5),
+      vz: (Math.random() - 0.5) * 0.5,
+    });
   }
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.4, transparent: true, opacity: 0.7, depthWrite: false });
-  const pts = new THREE.Points(geo, mat);
-  pts.userData.vel = vel;
-  scene.add(pts);
-  setSnowParticles(pts);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 0.25,
+    transparent: true,
+    opacity: 0.8,
+    depthWrite: false,
+  });
+  const points = new THREE.Points(geo, mat);
+  points.userData.velocities = velocities;
+  points.userData.count = count;
+  scene.add(points);
+  setSnowParticles(points);
+  return points;
+}
+
+export function updateSnow(dt) {
+  const snowMod = getSnowParticlesRef();
+  if (!snowMod) return;
+  const pos = snowMod.geometry.attributes.position.array;
+  const vels = snowMod.userData.velocities;
+  const player = getPlayerVehicle();
+  const px = player ? player.mesh.position.x : 0;
+  const py = player ? player.mesh.position.y : 0;
+  const pz = player ? player.mesh.position.z : 0;
+
+  for (let i = 0; i < snowMod.userData.count; i++) {
+    pos[i * 3] += vels[i].vx * dt * 10;
+    pos[i * 3 + 1] += vels[i].vy * dt * 10;
+    pos[i * 3 + 2] += vels[i].vz * dt * 10;
+    if (pos[i * 3 + 1] < py - 5) {
+      pos[i * 3] = px + (Math.random() - 0.5) * 100;
+      pos[i * 3 + 1] = py + 30 + Math.random() * 30;
+      pos[i * 3 + 2] = pz + (Math.random() - 0.5) * 100;
+    }
+  }
+  snowMod.geometry.attributes.position.needsUpdate = true;
 }

@@ -1,122 +1,167 @@
-// ============================================================================
-//  FX — exhaust, wheel dust, nitro flame visual effects + speed lines
-// ============================================================================
-
 import * as THREE from 'three';
-import { CFG } from './config.js';
-import { scene, camera, vehicles, playerVehicle, keys, nitroActive, currentSceneDef, speedLines, setSpeedLines } from './state.js';
-import { emitParticle, exhaustSys, dustSys, getNitroSys, nitroFlameSys } from './particles.js';
-
-export function initSpeedLines() {
-  const segCount = 60;
-  const segPos = new Float32Array(segCount * 6);
-  const segData = [];
-  for (let i = 0; i < segCount; i++) {
-    const idx = i * 6;
-    segPos[idx] = 0; segPos[idx + 1] = 0; segPos[idx + 2] = 0;
-    segPos[idx + 3] = 0; segPos[idx + 4] = 0; segPos[idx + 5] = 0;
-    segData.push({ life: 0, maxLife: 0 });
-  }
-  const segGeo = new THREE.BufferGeometry();
-  segGeo.setAttribute('position', new THREE.BufferAttribute(segPos, 3));
-  const segMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, depthWrite: false });
-  const lines = new THREE.LineSegments(segGeo, segMat);
-  lines.frustumCulled = false;
-  lines.userData.data = segData;
-  lines.userData.segCount = segCount;
-  setSpeedLines(lines);
-  camera.add(lines);
-  scene.add(camera);
-}
+import {
+  getCamera,
+  getKeys,
+  getCurrentSceneDef,
+  getExhaustSys,
+  getDustSys,
+  getNitroFlameSys,
+  getSpeedLines,
+  setSpeedLines,
+  getNitroActive,
+} from './state.js';
+import { emitParticle } from './particles.js';
 
 export function emitExhaustFx(v, speedKmh, drifting) {
-  if (!exhaustSys) return;
+  const sys = v.exhaust || getExhaustSys();
+  if (!sys || !v.mesh) return;
+  const keys = getKeys();
+  const scn = getCurrentSceneDef();
+
   let intensity = 0;
   if (v.isPlayer) {
-    if (keys.w) intensity = Math.min(1, speedKmh / 80 + (nitroActive ? 0.6 : 0));
-    if (keys.s) intensity = Math.max(intensity, 0.3);
-  } else intensity = Math.min(1, v.aiState.accel);
-  intensity = Math.min(1, intensity);
-  if (intensity < 0.1 || v.finished) return;
-  if (nitroActive && v.isPlayer) return;
-  const h = CFG.chassisSize;
-  const back = new THREE.Vector3(0, 0.05, -1).applyQuaternion(v.mesh.quaternion);
-  for (const side of [-1, 1]) {
-    const local = new THREE.Vector3(side * h.x * 0.4, -h.y * 0.3, -h.z - 0.3)
-      .applyQuaternion(v.mesh.quaternion).add(v.mesh.position);
-    const col = currentSceneDef.id === 'snow' ? (drifting ? 0xffffff : 0xcccccc) : (speedKmh > 120 ? 0x555555 : 0xdddddd);
-    emitParticle(exhaustSys, local.x, local.y, local.z,
-      back.x * (3 + Math.random() * 3) + (Math.random() - 0.5) * 1,
-      back.y * 2 + 0.5 + Math.random(),
-      back.z * (3 + Math.random() * 3) + (Math.random() - 0.5) * 1,
-      0.2 + Math.random() * 0.25, col);
+    intensity = keys.w ? 1 : 0.2;
+  } else {
+    intensity = v.aiState ? Math.max(0.2, v.aiState.accel) : 0.3;
+  }
+  if (drifting) intensity *= 1.5;
+  if (intensity < 0.15) return;
+
+  const mesh = v.mesh;
+  const quat = mesh.quaternion;
+  const back = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(quat);
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(quat);
+
+  let color = 0x666666;
+  if (speedKmh > 120) color = 0x333333;
+  if (scn && scn.id === 'snow') color = 0xdddddd;
+
+  for (let side = -1; side <= 1; side += 2) {
+    if (Math.random() > intensity) continue;
+    const ox = mesh.position.x - back.x * 2.0 + right.x * side * 0.4 + up.x * 0.25;
+    const oy = mesh.position.y - back.y * 2.0 + right.y * side * 0.4 + up.y * 0.25;
+    const oz = mesh.position.z - back.z * 2.0 + right.z * side * 0.4 + up.z * 0.25;
+    emitParticle(
+      sys,
+      ox, oy, oz,
+      -back.x * (2 + Math.random() * 3) + (Math.random() - 0.5),
+      0.5 + Math.random() * 1.5,
+      -back.z * (2 + Math.random() * 3) + (Math.random() - 0.5),
+      0.2 + Math.random() * 0.3,
+      color
+    );
   }
 }
 
 export function emitWheelDust(v, speedKmh, hard) {
-  if (!dustSys) return;
-  if (speedKmh < 15 || v.finished) return;
-  const scn = currentSceneDef;
-  if (scn.id === 'forest' && !hard) return;
-  const intensity = hard ? 2 : (scn.id === 'desert' ? 1 : 0.4);
-  const q = v.mesh.quaternion;
-  for (let wi = 2; wi <= 3; wi++) {
-    const wp = v.wheels[wi].position;
-    for (let k = 0; k < intensity; k++) {
-      const side = (Math.random() - 0.5) * 0.8;
-      const up = 0.5 + Math.random() * 0.8;
-      const back = -1 - Math.random() * 1.5;
-      const dir = new THREE.Vector3(side, up, back).applyQuaternion(q);
-      emitParticle(dustSys, wp.x + (Math.random() - 0.5) * 0.3, wp.y + 0.1, wp.z + (Math.random() - 0.5) * 0.3,
-        dir.x * (3 + Math.random() * 3) * 0.5, dir.y * 2, dir.z * (3 + Math.random() * 3) * 0.5,
-        0.25 + Math.random() * 0.3);
-    }
+  if (speedKmh < 15) return;
+  const sys = v.dustSys || getDustSys();
+  if (!sys || !v.mesh) return;
+  const scn = getCurrentSceneDef();
+
+  if (scn && scn.id === 'forest' && !hard) return;
+
+  let intensity = 0.4;
+  if (hard) intensity = 2;
+  else if (scn && scn.id === 'desert') intensity = 1;
+
+  const color = scn ? scn.dustColor : 0xcccccc;
+  const mesh = v.mesh;
+  const quat = mesh.quaternion;
+  const back = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(quat);
+
+  // rear wheels
+  for (let side = -1; side <= 1; side += 2) {
+    if (Math.random() > intensity * 0.5) continue;
+    const ox = mesh.position.x + right.x * side * 0.9 - back.x * 1.2;
+    const oy = mesh.position.y + 0.1;
+    const oz = mesh.position.z + right.z * side * 0.9 - back.z * 1.2;
+    emitParticle(
+      sys,
+      ox, oy, oz,
+      (Math.random() - 0.5) * 2,
+      0.5 + Math.random() * 2,
+      (Math.random() - 0.5) * 2,
+      0.15 + Math.random() * 0.25,
+      color
+    );
   }
 }
 
 export function emitNitroFlames(v) {
-  const s = getNitroSys();
-  const h = CFG.chassisSize;
-  const back = new THREE.Vector3(0, 0.05, -1).applyQuaternion(v.mesh.quaternion);
-  for (const side of [-1, 1]) {
-    const local = new THREE.Vector3(side * h.x * 0.4, -h.y * 0.25, -h.z - 0.35)
-      .applyQuaternion(v.mesh.quaternion).add(v.mesh.position);
-    const col = Math.random() < 0.5 ? 0x00e5ff : 0xff6a00;
-    emitParticle(s, local.x, local.y, local.z,
-      back.x * 6 + (Math.random() - 0.5) * 2, back.y * 2 + Math.random() * 1.5, back.z * 10 + Math.random() * 5,
-      0.35 + Math.random() * 0.3, col);
+  const sys = getNitroFlameSys();
+  if (!sys || !v.mesh) return;
+  const mesh = v.mesh;
+  const quat = mesh.quaternion;
+  const back = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(quat);
+
+  for (let side = -1; side <= 1; side += 2) {
+    const color = Math.random() < 0.5 ? 0x00ffff : 0xff8800;
+    const ox = mesh.position.x - back.x * 2.1 + right.x * side * 0.35;
+    const oy = mesh.position.y + 0.2;
+    const oz = mesh.position.z - back.z * 2.1 + right.z * side * 0.35;
+    emitParticle(
+      sys,
+      ox, oy, oz,
+      -back.x * 10 + (Math.random() - 0.5) * 2,
+      (Math.random() - 0.5) * 1,
+      -back.z * 10 + (Math.random() - 0.5) * 2,
+      0.3 + Math.random() * 0.3,
+      color
+    );
   }
 }
 
+export function initSpeedLines() {
+  const camera = getCamera();
+  if (!camera) return;
+  const group = new THREE.Group();
+  const lines = [];
+  for (let i = 0; i < 60; i++) {
+    const geo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, -1),
+    ]);
+    const mat = new THREE.LineBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0,
+    });
+    const line = new THREE.Line(geo, mat);
+    line.userData.life = 0;
+    line.userData.maxLife = 0.25 + Math.random() * 0.3;
+    group.add(line);
+    lines.push(line);
+  }
+  camera.add(group);
+  setSpeedLines({ group, lines });
+}
+
 export function updateSpeedLines(speedKmh) {
-  if (!speedLines) return;
+  const sl = getSpeedLines();
+  if (!sl) return;
   const intensity = Math.max(0, (speedKmh - 80) / 120);
-  const seg = speedLines.userData.data;
-  const pos = speedLines.geometry.attributes.position.array;
-  for (let i = 0; i < speedLines.userData.segCount; i++) {
-    const p = seg[i];
-    if (p.life < p.maxLife) {
-      p.life += 0.016;
-      const i6 = i * 6;
-      pos[i6 + 3] = pos[i6] + (pos[i6] - pos[i6 + 3]) * 0.5;
-      pos[i6 + 4] = pos[i6 + 1] + (pos[i6 + 1] - pos[i6 + 4]) * 0.5;
-      pos[i6 + 5] = pos[i6 + 2] + (pos[i6 + 2] - pos[i6 + 5]) * 0.5;
-      if (p.life >= p.maxLife) { pos[i6 + 1] = -999; pos[i6 + 4] = -999; }
-      continue;
-    }
-    if (Math.random() < intensity * 0.5) {
-      p.life = 0; p.maxLife = 0.25 + Math.random() * 0.3;
-      const angle = (Math.random() - 0.5) * 0.6;
-      const spread = 10;
-      const i6 = i * 6;
-      pos[i6] = (Math.random() - 0.5) * spread;
-      pos[i6 + 1] = (Math.random() - 0.5) * 6;
-      pos[i6 + 2] = -5 - Math.random() * 5;
-      pos[i6 + 3] = pos[i6] + Math.sin(angle) * 2;
-      pos[i6 + 4] = pos[i6 + 1];
-      pos[i6 + 5] = pos[i6 + 2] - 6 - Math.random() * 3;
+  const opacity = Math.min(0.8, intensity * 0.8);
+
+  for (const line of sl.lines) {
+    line.userData.life -= 0.016;
+    if (line.userData.life <= 0 && intensity > 0.05) {
+      // respawn
+      const x = (Math.random() - 0.5) * 8;
+      const y = (Math.random() - 0.5) * 5;
+      const z = -3 - Math.random() * 8;
+      const len = 0.5 + Math.random() * 1.5 * intensity;
+      const pos = line.geometry.attributes.position;
+      pos.setXYZ(0, x, y, z);
+      pos.setXYZ(1, x, y, z - len);
+      pos.needsUpdate = true;
+      line.userData.life = line.userData.maxLife;
+      line.material.opacity = opacity * (0.4 + Math.random() * 0.6);
+    } else {
+      line.material.opacity *= 0.95;
     }
   }
-  speedLines.geometry.attributes.position.needsUpdate = true;
-  speedLines.material.opacity = Math.min(0.8, intensity * 0.8);
 }

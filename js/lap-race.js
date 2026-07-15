@@ -1,83 +1,166 @@
-// ============================================================================
-//  Lap & Race — progress tracking, lap detection, race finish, standings
-// ============================================================================
-
+import {
+  getTrackCurve,
+  getVehicles,
+  getPlayerVehicle,
+  getRaceState,
+  setRaceState,
+  getLap,
+  setLap,
+  getLapStartTime,
+  setLapStartTime,
+  getBestLapMs,
+  setBestLapMs,
+  getRaceAccumMs,
+  setRaceAccumMs,
+  setTotalRaceMs,
+  setControlsEnabled,
+  getRlAgent,
+} from './state.js';
 import { CFG } from './config.js';
-import { vehicles, playerVehicle, trackCurve, raceState, lap, lapStartTime,
-         bestLapMs, raceAccumMs, totalRaceMs, controlsEnabled, nitro,
-         rlAgent, setRaceState, setControlsEnabled, setLap, setLapStartTime,
-         setBestLapMs, setRaceAccumMs, setTotalRaceMs, setNitro } from './state.js';
 import { nearestOnCurve } from './track-helpers.js';
 import { beep } from './audio.js';
 
 export function updateProgress(v) {
-  const nr = nearestOnCurve(trackCurve, v.mesh.position);
-  v.progress = nr.t;
+  const curve = getTrackCurve();
+  if (!curve || !v.mesh) return;
+  const r = nearestOnCurve(curve, v.mesh.position);
+  v.lastT = v.progress;
+  v.progress = r.t;
 }
 
 export function checkLaps() {
-  if (raceState !== 'racing') return;
-  checkVehicleLap(playerVehicle);
-  for (const v of vehicles) if (!v.isPlayer) checkVehicleLap(v);
-}
+  if (getRaceState() !== 'racing') return;
 
-function checkVehicleLap(v) {
-  if (v.finished) return;
-  const t = v.progress;
-  if (v.lastT > 0.88 && t < 0.12) {
-    v.lap++;
-    if (v.isPlayer) {
-      const lm = performance.now() - lapStartTime;
-      if (bestLapMs == null || lm < bestLapMs) setBestLapMs(lm);
-      setRaceAccumMs(raceAccumMs + lm);
-      setLap(lap + 1);
-      setLapStartTime(performance.now());
-      beep(880, 0.15, 0.15);
-      if (lap >= CFG.raceLaps) finishRace();
-    } else if (v.lap >= CFG.raceLaps) {
-      v.finished = true;
-      v.finishTime = raceAccumMs + (performance.now() - lapStartTime);
+  const vehicles = getVehicles();
+  const raceLaps = CFG.raceLaps;
+
+  for (const v of vehicles) {
+    if (v.finished) continue;
+
+    // Detect lap crossing: wrap around 0.88 → 0.12
+    if (v.lastT > 0.88 && v.progress < 0.12) {
+      v.lap++;
+
+      if (v.isPlayer) {
+        const now = performance.now();
+        const lapStart = getLapStartTime();
+        const lapMs = now - lapStart;
+        setRaceAccumMs(getRaceAccumMs() + lapMs);
+
+        const best = getBestLapMs();
+        if (best === null || lapMs < best) {
+          setBestLapMs(lapMs);
+        }
+        setLap(v.lap);
+        setLapStartTime(now);
+        beep(880, 0.15, 0.2);
+
+        if (v.lap >= raceLaps) {
+          finishRace();
+        }
+      } else {
+        if (v.lap >= raceLaps) {
+          v.finished = true;
+          v.finishTime = getRaceAccumMs() + (performance.now() - getLapStartTime());
+        }
+      }
     }
   }
-  v.lastT = t;
 }
 
-function finishRace() {
+export function finishRace() {
   setRaceState('finished');
   setControlsEnabled(false);
-  setTotalRaceMs(raceAccumMs);
-  if (rlAgent) rlAgent.save('car-ai-agent');
-  playerVehicle.finished = true;
-  playerVehicle.finishTime = totalRaceMs;
-  const sorted = standings();
-  const el = document.getElementById('race-results');
-  let html = '';
-  sorted.forEach((v, i) => {
-    const cls = v.isPlayer ? 'you' : (i === 0 ? 'pos1' : '');
-    const medal = i === 0 ? '\u{1F947}' : i === 1 ? '\u{1F948}' : i === 2 ? '\u{1F949}' : `${i + 1}.`;
-    const time = v.finishTime > 0 ? formatTime(v.finishTime) : 'na pista';
-    html += `<div class="${cls}">${medal} ${v.name} \u00b7 ${time}</div>`;
-  });
-  html += `<hr style="margin:0.8rem 0;border:0;border-top:1px solid var(--line);">`;
-  html += `<div>Melhor volta: <b>${formatTime(bestLapMs)}</b></div>`;
-  html += `<div>Tempo total: <b>${formatTime(totalRaceMs)}</b></div>`;
-  el.innerHTML = html;
-  document.getElementById('finish').hidden = false;
+
+  const agent = getRlAgent();
+  if (agent) agent.save('car-ai-agent');
+
+  const player = getPlayerVehicle();
+  if (player) {
+    player.finished = true;
+    const total = getRaceAccumMs() + (performance.now() - getLapStartTime());
+    player.finishTime = total;
+    setTotalRaceMs(total);
+  }
+
+  // Mark unfinished AI with estimated time
+  const vehicles = getVehicles();
+  for (const v of vehicles) {
+    if (!v.finished) {
+      v.finishTime = Infinity;
+    }
+  }
+
+  renderResults();
 }
 
 export function standings() {
-  return vehicles.slice().sort((a, b) => {
+  const vehicles = getVehicles().slice();
+  vehicles.sort((a, b) => {
     if (a.lap !== b.lap) return b.lap - a.lap;
     if (a.finished && b.finished) return a.finishTime - b.finishTime;
     if (a.finished) return -1;
     if (b.finished) return 1;
     return b.progress - a.progress;
   });
+  return vehicles;
 }
 
 export function formatTime(ms) {
-  if (ms == null || !Number.isFinite(ms)) return '\u2014';
-  const t = Math.max(0, ms);
-  const m = Math.floor(t / 60000), s = Math.floor((t % 60000) / 1000), mp = Math.floor(t % 1000);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(mp).padStart(3, '0')}`;
+  if (!isFinite(ms) || ms === null || ms === undefined) return '--:--.---';
+  const totalSec = ms / 1000;
+  const m = Math.floor(totalSec / 60);
+  const s = Math.floor(totalSec % 60);
+  const milli = Math.floor(ms % 1000);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(milli).padStart(3, '0')}`;
+}
+
+function renderResults() {
+  const el = document.getElementById('race-results');
+  if (!el) return;
+
+  const ranks = standings();
+  const medals = ['🥇', '🥈', '🥉', '4️⃣'];
+
+  let html = '<div class="finish-card">';
+  html += '<h2>Corrida Finalizada!</h2>';
+  html += '<ol class="podium">';
+  ranks.forEach((v, i) => {
+    const cls = [
+      i === 0 ? 'pos1' : '',
+      v.isPlayer ? 'you' : '',
+    ].filter(Boolean).join(' ');
+    const timeStr = v.finished && isFinite(v.finishTime)
+      ? formatTime(v.finishTime)
+        : `Volta ${Math.min(v.lap, 3)}/3`;
+    html += `<li class="${cls}">
+      <span class="medal">${medals[i] || (i + 1)}</span>
+      <span class="racer-name">${v.name}${v.isPlayer ? ' (Você)' : ''}</span>
+      <span class="racer-time">${timeStr}</span>
+    </li>`;
+  });
+  html += '</ol>';
+  html += '<div class="finish-actions">';
+  html += '<button id="restart-btn" class="btn primary">Reiniciar</button>';
+  html += '<button id="menu-btn" class="btn">Menu</button>';
+  html += '</div></div>';
+
+  el.innerHTML = html;
+  el.hidden = false;
+
+  // Wire buttons — main.js also binds, but re-bind here for safety
+  const restartBtn = document.getElementById('restart-btn');
+  const menuBtn = document.getElementById('menu-btn');
+  if (restartBtn) {
+    restartBtn.onclick = () => {
+      el.hidden = true;
+      window.dispatchEvent(new CustomEvent('carammo-restart'));
+    };
+  }
+  if (menuBtn) {
+    menuBtn.onclick = () => {
+      el.hidden = true;
+      window.dispatchEvent(new CustomEvent('carammo-menu'));
+    };
+  }
 }
