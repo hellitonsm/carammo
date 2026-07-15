@@ -144,10 +144,10 @@ export function updatePlayerVehicle(dt) {
 
   // Engine force
   const maxE = nitroActive ? CFG.nitroForce : CFG.engineForce;
+  const engineMult = v.engineMult || 1.0;
   if (keys.w) {
-    // Soft ramp so launch isn't instant full torque
     v.ramp = Math.min(1, v.ramp + dt * 0.9);
-    let force = maxE * (0.55 + 0.45 * v.ramp);
+    let force = maxE * (0.55 + 0.45 * v.ramp) * engineMult;
     if (speedMs < 0.3) force += 400;
     vehicle.applyEngineForce(force, 2);
     vehicle.applyEngineForce(force, 3);
@@ -158,7 +158,6 @@ export function updatePlayerVehicle(dt) {
   } else if (keys.s) {
     v.ramp = 0;
     if (speedKmh > 5) {
-      // brake
       vehicle.applyEngineForce(0, 2);
       vehicle.applyEngineForce(0, 3);
       vehicle.setBrake(CFG.brakingForce * 0.6, 0);
@@ -166,13 +165,12 @@ export function updatePlayerVehicle(dt) {
       vehicle.setBrake(CFG.brakingForce * 0.6, 2);
       vehicle.setBrake(CFG.brakingForce * 0.6, 3);
     } else {
-      // reverse
       vehicle.setBrake(0, 0);
       vehicle.setBrake(0, 1);
       vehicle.setBrake(0, 2);
       vehicle.setBrake(0, 3);
-      vehicle.applyEngineForce(-CFG.engineForce * 0.55, 2);
-      vehicle.applyEngineForce(-CFG.engineForce * 0.55, 3);
+      vehicle.applyEngineForce(-CFG.engineForce * 0.55 * engineMult, 2);
+      vehicle.applyEngineForce(-CFG.engineForce * 0.55 * engineMult, 3);
     }
   } else {
     v.ramp = Math.max(0, v.ramp - dt * 2);
@@ -184,9 +182,9 @@ export function updatePlayerVehicle(dt) {
     vehicle.setBrake(0, 3);
   }
 
-  // Downforce
   if (speedMs > 1) {
-    const df = speedMs * speedMs * 8 + (nitroActive ? 1800 : 0);
+    const dfMult = v.downforceMult || 1.0;
+    const df = (speedMs * speedMs * 8 + (nitroActive ? 1800 : 0)) * dfMult;
     v.body.applyCentralForce(new Ammo.btVector3(0, -df, 0));
   }
 

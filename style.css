@@ -519,10 +519,1028 @@ html, body {
   padding: 0.75rem;
 }
 
+.prize-display {
+  text-align: center;
+  padding: 0.75rem;
+  margin: 0.8rem 0;
+  background: rgba(46,204,113,0.1);
+  border: 1px solid rgba(46,204,113,0.3);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: var(--ok);
+}
+
+.prize-display strong {
+  font-size: 1.1rem;
+}
+
+/* ── Manager Header (Menu) ── */
+.manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 107, 26, 0.08);
+  border: 1px solid rgba(255, 107, 26, 0.2);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+
+.manager-money strong { color: var(--ok); }
+.manager-car strong { color: var(--accent2); }
+
+/* ── Open Manager Button ── */
+.menu-main-actions {
+  margin-bottom: 1rem;
+}
+
+.btn-manager {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 1rem 1.2rem;
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.12), rgba(0, 150, 200, 0.08));
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s, border-color 0.15s;
+  text-align: left;
+  color: var(--text);
+  font-family: inherit;
+}
+
+.btn-manager:hover {
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 150, 200, 0.15));
+  border-color: rgba(0, 212, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-manager-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.btn-manager-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.btn-manager-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent2);
+}
+
+.btn-manager-sub {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* ── Management Overlay ── */
+#manager-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#manager-overlay[hidden] { display: none !important; }
+
+.mgr-overlay-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+}
+
+.mgr-overlay-content {
+  position: relative;
+  width: min(1100px, 96vw);
+  height: min(700px, 90vh);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Manager Header ── */
+.mgr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  flex-shrink: 0;
+}
+
+.mgr-header-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.4rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, var(--accent2), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.mgr-header-stats {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.85rem;
+}
+
+.mgr-header-money strong { color: var(--ok); }
+.mgr-header-car strong { color: var(--accent2); }
+
+.btn-close-mgr {
+  font-size: 1.2rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-close-mgr:hover {
+  background: rgba(231, 76, 60, 0.2);
+  color: var(--danger);
+}
+
+/* ── Manager Body ── */
+.mgr-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Sidebar ── */
+.mgr-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  padding: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.mgr-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1.2rem;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  text-align: left;
+  width: 100%;
+}
+
+.mgr-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.mgr-nav-btn.active {
+  background: rgba(255, 107, 26, 0.12);
+  color: var(--accent);
+  border-left: 3px solid var(--accent);
+}
+
+.mgr-nav-icon {
+  font-size: 1.1rem;
+  width: 1.4rem;
+  text-align: center;
+}
+
+/* ── Main Content ── */
+.mgr-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) transparent;
+}
+
+.mgr-section {
+  animation: mgrFadeIn 0.2s ease;
+}
+
+@keyframes mgrFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.mgr-section-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+  margin-bottom: 0.4rem;
+}
+
+.mgr-section-desc {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-bottom: 1.2rem;
+}
+
+/* ── Grids ── */
+.mgr-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.mgr-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+/* ── Panels ── */
+.mgr-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.2rem;
+}
+
+.mgr-panel-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.8rem;
+}
+
+/* ── Car Preview (Overview) ── */
+.mgr-car-preview {
+  width: 100%;
+  height: 80px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.8rem;
+  box-shadow: inset 0 -12px 24px rgba(0, 0, 0, 0.4);
+  position: relative;
+}
+
+.mgr-car-tier {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+}
+
+.mgr-car-name {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.2rem;
+  margin-bottom: 0.3rem;
+}
+
+.mgr-car-desc {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 0.6rem;
+  line-height: 1.4;
+}
+
+.mgr-power-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.8rem;
+  background: rgba(255, 107, 26, 0.1);
+  border: 1px solid rgba(255, 107, 26, 0.2);
+  border-radius: 8px;
+}
+
+.mgr-ps-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.mgr-ps-value {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.5rem;
+  color: var(--accent);
+}
+
+/* ── Stat Bars (Overview) ── */
+.mgr-stat-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 40px auto;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.mgr-stat-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mgr-stat-bar-wrap {
+  position: relative;
+}
+
+.mgr-stat-bar {
+  height: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 5px;
+  overflow: hidden;
+  position: relative;
+}
+
+.mgr-stat-base {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+}
+
+.mgr-stat-val {
+  font-size: 0.75rem;
+  color: var(--text);
+  text-align: right;
+  font-weight: 600;
+}
+
+.mgr-dmg-tag {
+  font-size: 0.65rem;
+  background: rgba(231, 76, 60, 0.2);
+  color: var(--danger);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+}
+
+.mgr-dmg-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.mgr-ok {
+  font-size: 0.78rem;
+  color: var(--ok);
+  margin-top: 0.4rem;
+}
+
+/* ── Stat Cards ── */
+.mgr-stat-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.mgr-stat-icon {
+  font-size: 1.5rem;
+}
+
+.mgr-stat-num {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.3rem;
+  color: var(--text);
+}
+
+.mgr-stat-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Parts List ── */
+.mgr-parts-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.mgr-part-tag {
+  font-size: 0.72rem;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  color: var(--accent2);
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+}
+
+.mgr-part-tag small {
+  color: var(--muted);
+  margin-left: 0.3rem;
+}
+
+/* ── Car List (Garage) ── */
+.mgr-car-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mgr-car-detail {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: border-color 0.15s;
+}
+
+.mgr-car-detail.active {
+  border-color: var(--accent);
+  background: rgba(255, 107, 26, 0.04);
+}
+
+.mgr-car-detail-left {
+  flex-shrink: 0;
+}
+
+.mgr-car-swatch {
+  width: 60px;
+  height: 60px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 -6px 12px rgba(0, 0, 0, 0.35);
+  position: relative;
+}
+
+.mgr-car-detail-center {
+  flex: 1;
+  min-width: 0;
+}
+
+.mgr-car-detail-name {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1rem;
+  margin-bottom: 0.2rem;
+}
+
+.mgr-mini-stats {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+}
+
+.mgr-mini-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1;
+}
+
+.mgr-mini-label {
+  font-size: 0.65rem;
+  color: var(--muted);
+  font-weight: 600;
+  width: 12px;
+}
+
+.mgr-mini-bar-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.mgr-mini-val {
+  font-size: 0.65rem;
+  color: var(--text);
+  width: 14px;
+  text-align: right;
+}
+
+.mgr-car-meta {
+  display: flex;
+  gap: 0.8rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.mgr-car-meta strong {
+  color: var(--text);
+}
+
+.mgr-car-detail-right {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.mgr-active-tag {
+  font-size: 0.7rem;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  padding: 0.25rem 0.6rem;
+  background: rgba(255, 107, 26, 0.12);
+  border-radius: 4px;
+}
+
+/* ── Workshop ── */
+.mgr-upgrade-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.mgr-upgrade-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.mgr-upgrade-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.mgr-upgrade-icon {
+  font-size: 1.3rem;
+}
+
+.mgr-upgrade-name {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+}
+
+.mgr-upgrade-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.mgr-upgrade-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mgr-upgrade-level {
+  font-size: 0.7rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.mgr-upgrade-dmg {
+  font-size: 0.68rem;
+  color: var(--danger);
+  margin-bottom: 0.5rem;
+}
+
+/* ── Repair Grid ── */
+.mgr-repair-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.mgr-repair-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem;
+}
+
+.mgr-repair-name {
+  font-size: 0.82rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.mgr-repair-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.mgr-repair-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.mgr-repair-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #e74c3c, #c0392b);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.mgr-repair-pct {
+  font-size: 0.68rem;
+  color: var(--danger);
+  width: 28px;
+  text-align: right;
+}
+
+/* ── Shop Cards ── */
+.mgr-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.mgr-shop-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  transition: border-color 0.15s;
+}
+
+.mgr-shop-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.mgr-shop-card.owned {
+  opacity: 0.6;
+}
+
+.mgr-shop-card-top {
+  display: flex;
+  gap: 0.8rem;
+  margin-bottom: 0.6rem;
+}
+
+.mgr-shop-swatch {
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  box-shadow: inset 0 -5px 10px rgba(0, 0, 0, 0.35);
+  position: relative;
+}
+
+.mgr-shop-card-info h4 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.95rem;
+  margin-bottom: 0.15rem;
+}
+
+.mgr-shop-card-stats {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.mgr-shop-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.mgr-shop-ps {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.mgr-shop-ps strong {
+  color: var(--text);
+}
+
+.mgr-owned-tag {
+  font-size: 0.7rem;
+  color: var(--ok);
+  letter-spacing: 0.04em;
+}
+
+/* ── Part Shop ── */
+.mgr-part-type-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 1rem 0 0.6rem;
+}
+
+.mgr-part-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.mgr-part-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.8rem;
+  transition: border-color 0.15s;
+}
+
+.mgr-part-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.mgr-part-card.installed {
+  border-color: rgba(46, 204, 113, 0.3);
+  background: rgba(46, 204, 113, 0.04);
+}
+
+.mgr-part-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+}
+
+.mgr-part-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.mgr-part-bonus {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.85rem;
+  color: var(--ok);
+}
+
+.mgr-part-desc {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+  line-height: 1.3;
+}
+
+.mgr-part-req {
+  font-size: 0.65rem;
+  display: block;
+  margin-bottom: 0.4rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+}
+
+.mgr-part-req.met {
+  color: var(--ok);
+  background: rgba(46, 204, 113, 0.1);
+}
+
+.mgr-part-req.unmet {
+  color: var(--danger);
+  background: rgba(231, 76, 60, 0.1);
+}
+
+.mgr-part-card-footer {
+  padding-top: 0.4rem;
+}
+
+.mgr-installed-tag {
+  font-size: 0.68rem;
+  color: var(--ok);
+}
+
+/* ── Tier Badges ── */
+.car-tier-badge, .mgr-car-tier {
+  display: inline-block;
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.1);
+  color: var(--muted);
+}
+
+.tier-D { background: rgba(150,150,150,0.2); color: #aaa; }
+.tier-C { background: rgba(76,175,80,0.2); color: #66bb6a; }
+.tier-B { background: rgba(33,150,243,0.2); color: #42a5f5; }
+.tier-A { background: rgba(156,39,176,0.2); color: #ab47bc; }
+.tier-S { background: rgba(255,152,0,0.2); color: #ffa726; }
+.tier-SS { background: rgba(255,61,0,0.2); color: #ff5722; }
+
+/* ── Stat Fills ── */
+.stat-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.stat-fill.motor { background: linear-gradient(90deg, #ff6b1a, #ff3d00); }
+.stat-fill.aero { background: linear-gradient(90deg, #00bcd4, #0097a7); }
+.stat-fill.pneus { background: linear-gradient(90deg, #4caf50, #2e7d32); }
+
+/* ── Buttons ── */
+.btn-sm {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.btn-sm:hover:not(.disabled) { transform: translateY(-1px); }
+.btn-sm.disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-accent {
+  background: rgba(255, 107, 26, 0.15);
+  border-color: rgba(255, 107, 26, 0.3);
+  color: var(--accent);
+}
+
+.btn-accent:hover:not(.disabled) { background: rgba(255, 107, 26, 0.3); }
+
+.btn-ok {
+  background: rgba(46, 204, 113, 0.15);
+  border-color: rgba(46, 204, 113, 0.3);
+  color: var(--ok);
+}
+
+.btn-ok:hover:not(.disabled) { background: rgba(46, 204, 113, 0.3); }
+
+.btn-danger {
+  border-color: rgba(231, 76, 60, 0.3);
+  color: var(--danger);
+}
+
+.btn-danger:hover:not(.disabled) { background: rgba(231, 76, 60, 0.15); }
+
+.btn-full {
+  width: 100%;
+  padding: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.text-ok { color: var(--ok); }
+.text-danger { color: var(--danger); }
+
+/* ── Menu Footer ── */
+.menu-footer-actions {
+  text-align: center;
+  margin-top: 0.8rem;
+}
+
+/* ── Toast ── */
+#toast-container {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+  pointer-events: none;
+}
+
+.toast {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast-success { border-color: rgba(46,204,113,0.4); }
+.toast-error { border-color: rgba(231,76,60,0.4); color: var(--danger); }
+
+/* ── HUD Damage ── */
+.hud-damage {
+  position: absolute;
+  left: 1.2rem;
+  bottom: 3.5rem;
+  font-size: 0.7rem;
+  color: var(--danger);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.7);
+}
+
 @media (max-width: 600px) {
   .scene-grid { grid-template-columns: 1fr; }
   #speed { font-size: 2.2rem; }
   #minimap { width: 140px; height: 140px; }
   #position-info { top: 160px; }
   #countdown { font-size: 5rem; }
+
+  .mgr-overlay-content {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .mgr-body {
+    flex-direction: column;
+  }
+
+  .mgr-sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem;
+    gap: 0.25rem;
+  }
+
+  .mgr-nav-btn {
+    white-space: nowrap;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.72rem;
+  }
+
+  .mgr-grid-2, .mgr-grid-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .mgr-upgrade-grid, .mgr-repair-grid, .mgr-part-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mgr-shop-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mgr-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .mgr-header-stats {
+    font-size: 0.75rem;
+    gap: 0.8rem;
+  }
 }

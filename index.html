@@ -16,12 +16,27 @@
 <body>
   <canvas id="game-canvas"></canvas>
 
-  <!-- Menu -->
+  <!-- Menu Principal -->
   <div id="menu">
     <div class="menu-bg"></div>
     <div class="menu-content">
       <h1 class="logo">CarAmmo Deluxe</h1>
-      <p class="tagline">Corrida 3D · Física Bullet · IA Neural no navegador</p>
+      <p class="tagline">Corrida 3D · Gerenciamento · IA Neural</p>
+
+      <div class="manager-header">
+        <span class="manager-money">Saldo: <strong id="mgr-money">$10.000</strong></span>
+        <span class="manager-car">Carro: <strong id="active-car-name">Carammo GT (D)</strong></span>
+      </div>
+
+      <div class="menu-main-actions">
+        <button id="open-manager-btn" class="btn btn-manager" type="button">
+          <span class="btn-manager-icon">🔧</span>
+          <span class="btn-manager-text">
+            <span class="btn-manager-title">Garagem & Loja</span>
+            <span class="btn-manager-sub">Upgrades, reparos, carros e peças</span>
+          </span>
+        </button>
+      </div>
 
       <div class="section-title">Cenário</div>
       <div class="scene-grid" id="scene-select">
@@ -42,28 +57,9 @@
         </button>
       </div>
 
-      <div class="section-title">Cor do carro</div>
-      <div class="car-grid" id="car-select">
-        <button class="car-option" data-color="d62828" type="button" title="Vermelho">
-          <div class="car-preview" style="background:#d62828"></div>
-        </button>
-        <button class="car-option" data-color="1e6bb8" type="button" title="Azul">
-          <div class="car-preview" style="background:#1e6bb8"></div>
-        </button>
-        <button class="car-option" data-color="2a9d5c" type="button" title="Verde">
-          <div class="car-preview" style="background:#2a9d5c"></div>
-        </button>
-        <button class="car-option" data-color="f4c430" type="button" title="Amarelo">
-          <div class="car-preview" style="background:#f4c430"></div>
-        </button>
-        <button class="car-option" data-color="1a1a1a" type="button" title="Preto">
-          <div class="car-preview" style="background:#1a1a1a"></div>
-        </button>
-      </div>
-
       <div class="section-title">Opções</div>
       <div class="options-row">
-        <label class="opt"><input type="checkbox" id="opt-ai" checked /> Adversários IA</label>
+        <label class="opt"><input type="checkbox" id="opt-ai" checked /> Adversários IA (4)</label>
         <label class="opt"><input type="checkbox" id="opt-nitro" checked /> Nitro</label>
         <label class="opt"><input type="checkbox" id="opt-neural" checked /> IA Neural (DQN)</label>
       </div>
@@ -75,6 +71,10 @@
 
       <button id="start-btn" class="btn primary" type="button" disabled>Iniciar Corrida</button>
 
+      <div class="menu-footer-actions">
+        <button class="btn btn-small btn-danger" data-action="reset-save" type="button">Resetar Save</button>
+      </div>
+
       <p class="controls-hint">
         <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> dirigir ·
         <kbd>Espaço</kbd> freio de mão ·
@@ -83,6 +83,49 @@
         <kbd>R</kbd> reset ·
         <kbd>ESC</kbd> pausa
       </p>
+    </div>
+  </div>
+
+  <!-- Management Overlay -->
+  <div id="manager-overlay" hidden>
+    <div class="mgr-overlay-bg"></div>
+    <div class="mgr-overlay-content">
+      <header class="mgr-header">
+        <h2 class="mgr-header-title">Gerenciamento</h2>
+        <div class="mgr-header-stats">
+          <span class="mgr-header-money">💰 <strong id="mgr-overlay-money">$10.000</strong></span>
+          <span class="mgr-header-car">🏎 <strong id="mgr-overlay-car">Carammo GT</strong></span>
+        </div>
+        <button id="close-manager-btn" class="btn btn-close-mgr" type="button">✕</button>
+      </header>
+
+      <div class="mgr-body">
+        <nav class="mgr-sidebar">
+          <button class="mgr-nav-btn active" data-section="overview" type="button">
+            <span class="mgr-navicon">📊</span> Visão Geral
+          </button>
+          <button class="mgr-nav-btn" data-section="garage" type="button">
+            <span class="mgr-nav-icon">🏎</span> Garagem
+          </button>
+          <button class="mgr-nav-btn" data-section="workshop" type="button">
+            <span class="mgr-nav-icon">🔧</span> Oficina
+          </button>
+          <button class="mgr-nav-btn" data-section="carshop" type="button">
+            <span class="mgr-nav-icon">🏪</span> Loja de Carros
+          </button>
+          <button class="mgr-nav-btn" data-section="partshop" type="button">
+            <span class="mgr-nav-icon">⚙️</span> Loja de Peças
+          </button>
+        </nav>
+
+        <main class="mgr-main">
+          <div id="mgr-section-overview" class="mgr-section"></div>
+          <div id="mgr-section-garage" class="mgr-section" hidden></div>
+          <div id="mgr-section-workshop" class="mgr-section" hidden></div>
+          <div id="mgr-section-carshop" class="mgr-section" hidden></div>
+          <div id="mgr-section-partshop" class="mgr-section" hidden></div>
+        </main>
+      </div>
     </div>
   </div>
 
@@ -100,7 +143,8 @@
       <div id="nitro-bar"></div>
     </div>
     <canvas id="minimap" width="200" height="200"></canvas>
-    <div id="position-info">Posição: 1/4</div>
+    <div id="position-info">Posição: 1/5</div>
+    <div id="hud-damage" class="hud-damage"></div>
   </div>
 
   <div id="countdown" hidden>3</div>

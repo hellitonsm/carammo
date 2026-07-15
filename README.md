@@ -4,6 +4,16 @@ Jogo de corrida 3D usando **Three.js** + **Ammo.js**, com 3 cenários distintos,
 
 ## Funcionalidades
 
+### Sistema de Gerenciamento
+- **5 carros jogáveis** com tiers (D → S): Carammo GT, Viper RS, Falcon X, Phantom S, Titan SS
+- **10 peças instaláveis** com árvore de pré-requisitos (Turbo, ECU, Spoiler, Pneus, etc.)
+- **Upgrades** de motor, aerodinâmica e pneus com nível máximo por carro
+- **Sistema de dano** — cada corrida desgasta motor, aero e pneus; reparo individual ou completo
+- **Economia** — saldo inicial $10.000, prêmios por posição ($500–$5.000), custos de reparo e upgrades
+- **Compra e venda** de carros com 50% de valor de revenda
+- **Stats afetam gameplay** — motor → força, pneus → atrito, aero → downforce
+- **Overlay completo** com sidebar: Visão Geral, Garagem, Oficina, Loja de Carros, Loja de Peças
+
 ### 3 Cenários jogáveis
 - **Floresta** — circuito clássico com vegetação densa, curvas largas, postes, barreiras vermelhas e asfalto escuro
 - **Deserto** — dunas ao fundo, céu de pôr-do-sol, atrito menor (mais derrapagem), cactos e poeira nos pneus
@@ -17,7 +27,7 @@ Jogo de corrida 3D usando **Three.js** + **Ammo.js**, com 3 cenários distintos,
 
 ### IA com Rede Neural (DQN)
 - **4 voltas por corrida** (configurável em `CFG.raceLaps`)
-- **3 adversários IA** (Rocket, Flash, Shadow) com níveis de habilidade
+- **4 adversários IA** (Rocket, Flash, Shadow, Blaze) com níveis de habilidade
 - **Rede neural treina em tempo real** no browser durante as corridas
 - **Agente DQN** com replay buffer, epsilon-greedy, Double DQN, target network
 - Salvamento automático a cada 1000 frames + ao fechar aba
@@ -93,6 +103,7 @@ carammo/
 ├── rl-agent.js             # Agente DQN (replay buffer, epsilon-greedy)
 ├── SPEC.md                 # Especificacao completa da arquitetura
 ├── js/
+│   ├── manager.js          # Gerenciamento: carros, pecas, upgrades, economia
 │   ├── state.js            # Estado mutavel central + getters/setters
 │   ├── config.js           # Constantes (CFG)
 │   ├── physics.js          # Mundo Ammo.js

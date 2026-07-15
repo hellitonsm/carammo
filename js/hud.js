@@ -17,6 +17,7 @@ import {
 } from './state.js';
 import { CFG } from './config.js';
 import { formatTime, standings } from './lap-race.js';
+import { getState, getEffectiveStats } from './manager.js';
 
 export function updateHUD() {
   const player = getPlayerVehicle();
@@ -65,6 +66,18 @@ export function updateHUD() {
   const pauseOverlay = document.getElementById('pause-overlay');
   if (pauseOverlay) {
     pauseOverlay.hidden = !getPaused();
+  }
+
+  const dmgEl = document.getElementById('hud-damage');
+  if (dmgEl) {
+    const s = getState();
+    const dmg = s.damage[s.activeCar] || { motor: 0, aero: 0, pneus: 0 };
+    const totalDmg = dmg.motor + dmg.aero + dmg.pneus;
+    if (totalDmg > 30) {
+      dmgEl.textContent = `⚠ Dano: M${dmg.motor}% A${dmg.aero}% P${dmg.pneus}%`;
+    } else {
+      dmgEl.textContent = '';
+    }
   }
 }
 

@@ -13,6 +13,11 @@ import {
 } from './state.js';
 import { CFG } from './config.js';
 import { nearestOnCurve } from './track-helpers.js';
+import {
+  getEngineForceMultiplier,
+  getFrictionMultiplier,
+  getAeroDownforceMultiplier,
+} from './manager.js';
 
 export function buildCarMesh(colorHex) {
   const g = new THREE.Group();
@@ -202,7 +207,7 @@ export function createVehicle(colorHex, startIdx, isPlayer, name, skill) {
   vehicle.setCoordinateSystem(0, 1, 2);
   physicsWorld.addAction(vehicle);
 
-  const frictionSlip = (scn ? scn.trackFriction : 0.88) * 10;
+  const frictionSlip = (scn ? scn.trackFriction : 0.88) * 10 * (isPlayer ? getFrictionMultiplier() : 1.0);
   const wheelDir = new Ammo.btVector3(0, -1, 0);
   const wheelAxle = new Ammo.btVector3(-1, 0, 0);
   const suspensionRest = 0.35;
@@ -289,12 +294,14 @@ export function createVehicle(colorHex, startIdx, isPlayer, name, skill) {
     },
     ramp: 0,
     startP,
-    exhaust: null, // shared via getExhaustSys()
+    exhaust: null,
     dustSys: null,
     prevSpeed: 0,
     lastAction: null,
     lastState: null,
     lastProgress: 0,
+    engineMult: isPlayer ? getEngineForceMultiplier() : 1.0,
+    downforceMult: isPlayer ? getAeroDownforceMultiplier() : 1.0,
   };
 
   return v;

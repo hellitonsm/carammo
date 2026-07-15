@@ -19,6 +19,7 @@ import {
 import { CFG } from './config.js';
 import { nearestOnCurve } from './track-helpers.js';
 import { beep } from './audio.js';
+import { addPrize, applyRaceDamage, getMoney } from './manager.js';
 
 export function updateProgress(v) {
   const curve = getTrackCurve();
@@ -83,7 +84,6 @@ export function finishRace() {
     setTotalRaceMs(total);
   }
 
-  // Mark unfinished AI with estimated time
   const vehicles = getVehicles();
   for (const v of vehicles) {
     if (!v.finished) {
@@ -91,7 +91,15 @@ export function finishRace() {
     }
   }
 
-  renderResults();
+  const ranks = standings();
+  const playerPos = ranks.findIndex(v => v.isPlayer);
+  let prize = 0;
+  if (playerPos >= 0) {
+    prize = addPrize(playerPos);
+    applyRaceDamage();
+  }
+
+  renderResults(prize, playerPos);
 }
 
 export function standings() {
@@ -115,12 +123,12 @@ export function formatTime(ms) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(milli).padStart(3, '0')}`;
 }
 
-function renderResults() {
+function renderResults(prize, playerPos) {
   const el = document.getElementById('race-results');
   if (!el) return;
 
   const ranks = standings();
-  const medals = ['🥇', '🥈', '🥉', '4️⃣'];
+  const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
 
   let html = '<div class="finish-card">';
   html += '<h2>Corrida Finalizada!</h2>';
@@ -140,6 +148,11 @@ function renderResults() {
     </li>`;
   });
   html += '</ol>';
+
+  if (prize > 0) {
+    html += `<div class="prize-display">Prêmio: <strong>$${prize.toLocaleString()}</strong> · Saldo: $${getMoney().toLocaleString()}</div>`;
+  }
+
   html += '<div class="finish-actions">';
   html += '<button id="restart-btn" class="btn primary">Reiniciar</button>';
   html += '<button id="menu-btn" class="btn">Menu</button>';
@@ -148,7 +161,6 @@ function renderResults() {
   el.innerHTML = html;
   el.hidden = false;
 
-  // Wire buttons — main.js also binds, but re-bind here for safety
   const restartBtn = document.getElementById('restart-btn');
   const menuBtn = document.getElementById('menu-btn');
   if (restartBtn) {

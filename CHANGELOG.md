@@ -3,6 +3,19 @@
 ## [Unreleased]
 
 ### Added
+- **Sistema de gerenciamento completo** (`js/manager.js`) — catálogo de carros, loja de peças, upgrades, reparos, compra/venda de veículos
+- Overlay de gerenciamento com sidebar (📊 Visão Geral, 🏎 Garagem, 🔧 Oficina, 🏪 Loja de Carros, ⚙️ Loja de Peças)
+- 5 carros jogáveis com tiers (D, C, B, A, S): Carammo GT, Viper RS, Falcon X, Phantom S, Titan SS
+- 10 peças instaláveis com sistema de pré-requisitos (Turbo, ECU, Escape, Spoiler, Difusor, Splitter, Pneus, Suspensão)
+- Upgrades de motor/aero/pneus com nível máximo por carro
+- Sistema de dano por corrida (motor, aerodinâmica, pneus) com reparo individual ou completo
+- Prêmios em dinheiro por posição (1º=$5000, 2º=$3000, 3º=$2000, 4º=$1000, 5º=$500)
+- Motor, atrito e downforce afetados por stats do carro ativo (multipliers)
+- Indicador de dano no HUD quando total > 30%
+- 4 adversários IA (Rocket, Flash, Shadow, Blaze) em vez de 3
+- Botão "Resetar Save" no menu principal
+- Header no menu com saldo e nome do carro ativo
+- Saldo exibido no resultado da corrida
 - SPEC.md com especificação completa da arquitetura do jogo
 - Toggle de IA Neural no menu (checkbox)
 - Botão de resetar pesos da IA com status (passos + tamanho)
@@ -28,6 +41,7 @@
 - Hiperparâmetros: lr 0.001→0.003, gamma 0.99→0.95, epsilon 1.0→0.6, buffer 100K→30K
 - IA refatorada: separada em updateNeuralAI() e updateRuleBasedAI()
 - Reward reformulado: track alignment bonus, staying on track bonus, backward penalty
+- Seleção de cor removida do menu (cor agora vem do carro ativo no catálogo)
 
 ## [0.4.0] - 2026-07-15
 
