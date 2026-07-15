@@ -71,34 +71,26 @@ const DESERT_POINTS = [
 ];
 
 const SNOW_POINTS = [
+  // Início — nível do chão, reta para frente
   [0, 0, 0],
-  [40, -0.1, 5],
-  [90, -0.3, 0],
-  // Descida longa e rápida
-  [140, -0.5, -20],
-  [170, -0.3, -55],
-  [165, 0.0, -95],
-  // Curva sobre lago congelado (cuidado com gelo!)
-  [130, 0.2, -130],
-  [80, 0.4, -150],
-  [25, 0.3, -145],
-  [-15, 0.25, -120],
+  [45, 0, 12],
+  [85, 0, 8],
+  [115, 0, -15],
   // Subida íngreme pela montanha
-  [-40, 0.4, -85],
-  [-30, 0.6, -50],
-  [-5, 0.8, -20],
-  [20, 1.0, 10],
-  // Plateau topo da montanha (reta longa com gelo)
-  [40, 1.1, 45],
-  [25, 1.0, 75],
-  [-10, 0.8, 90],
-  // Curva técnica descendo
-  [-55, 0.6, 85],
-  [-100, 0.4, 65],
-  [-130, 0.2, 30],
-  [-120, 0.0, 0],
-  [-90, -0.1, -15],
-  [-50, -0.05, -10],
+  [125, 1.0, -55],
+  [105, 2.0, -95],
+  [65, 3.0, -115],
+  // Ponte — cruzando sobre a pista inicial
+  [25, 3.8, -85],
+  [5, 3.8, -50],
+  // Descida da ponte
+  [-25, 2.8, -15],
+  [-55, 1.8, 5],
+  [-75, 0.8, 35],
+  // Volta ao nível do chão
+  [-60, 0, 65],
+  [-30, 0, 55],
+  [-10, 0, 28],
 ];
 
 // ---- DEFINIÇÃO DOS 3 CENÁRIOS ----

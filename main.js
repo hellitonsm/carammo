@@ -693,6 +693,7 @@ function buildEnvironment(scn,curve,bound,wFn){
 
   if (scn.id === 'desert') {
     addDunes(curve, wFn);
+    addCanyon(curve, wFn);
     if (scn.hasBarrels) addBarrels(curve, wFn);
     if (scn.hasTumbleweeds) addTumbleweeds(curve, bound, wFn);
   }
@@ -701,6 +702,7 @@ function buildEnvironment(scn,curve,bound,wFn){
     if (scn.hasSnowPiles) addSnowPiles(curve, wFn);
     if (scn.hasSnowmen) addSnowmen(curve, wFn);
     addSnowTracks(curve, wFn);
+    addBridge(curve, wFn);
     // Pine trees are already covered above; add a couple of frozen lakes in the distance
     addFrozenLakes(curve, bound);
   }
@@ -862,6 +864,88 @@ function addDunes(curve, wFn) {
   }
 }
 
+function addCanyon(curve, wFn) {
+  const canyonT = 0.38;
+  const p = curve.getPointAt(canyonT);
+  const tan = curve.getTangentAt(canyonT).normalize();
+  const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x8a5a28, roughness: 0.95 });
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x6a4020, roughness: 0.9 });
+
+  for (let side = -1; side <= 1; side += 2) {
+    const wallGroup = new THREE.Group();
+
+    const mainWall = new THREE.Mesh(
+      new THREE.BoxGeometry(18, 22, 28),
+      wallMat
+    );
+    mainWall.position.set(0, 10, 0);
+    mainWall.castShadow = true;
+    mainWall.receiveShadow = true;
+    wallGroup.add(mainWall);
+
+    const topRock = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(6, 1),
+      rockMat
+    );
+    topRock.position.set(0, 22, 0);
+    topRock.scale.set(1.2, 0.7, 1.0);
+    topRock.castShadow = true;
+    wallGroup.add(topRock);
+
+    for (let i = 0; i < 8; i++) {
+      const boulder = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(1.5 + Math.random() * 2.5, 0),
+        rockMat
+      );
+      boulder.position.set(
+        (Math.random() - 0.5) * 16,
+        Math.random() * 8,
+        (Math.random() - 0.5) * 24
+      );
+      boulder.rotation.set(Math.random(), Math.random(), Math.random());
+      boulder.castShadow = true;
+      wallGroup.add(boulder);
+    }
+
+    const wallPos = p.clone().addScaledVector(n, side * (trackWidth / 2 + 10));
+    wallGroup.position.set(wallPos.x, p.y - 1, wallPos.z);
+    wallGroup.rotation.y = Math.atan2(tan.x, tan.z);
+    scene.add(wallGroup);
+  }
+
+  const archGeo = new THREE.TorusGeometry(trackWidth / 2 + 2, 1.5, 8, 12, Math.PI);
+  const archMat = new THREE.MeshStandardMaterial({ color: 0x7a4a22, roughness: 0.9 });
+  const arch = new THREE.Mesh(archGeo, archMat);
+  arch.position.set(p.x, p.y + 14, p.z);
+  arch.rotation.y = Math.atan2(tan.x, tan.z);
+  arch.rotation.z = Math.PI;
+  arch.castShadow = true;
+  scene.add(arch);
+
+  const cliffMat = new THREE.MeshStandardMaterial({ color: 0x9a6a38, roughness: 0.95 });
+  for (let i = 0; i < 12; i++) {
+    const t2 = canyonT + (i - 6) * 0.008;
+    const p2 = curve.getPointAt(Math.max(0.01, Math.min(0.99, t2)));
+    const tan2 = curve.getTangentAt(Math.max(0.01, Math.min(0.99, t2)));
+    const n2 = new THREE.Vector3(-tan2.z, 0, tan2.x).normalize();
+    for (let side = -1; side <= 1; side += 2) {
+      const cliff = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(2 + Math.random() * 3, 0),
+        cliffMat
+      );
+      const dist = trackWidth / 2 + 3 + Math.random() * 5;
+      const cp = p2.clone().addScaledVector(n2, side * dist);
+      cliff.position.set(cp.x, p2.y + Math.random() * 4, cp.z);
+      cliff.rotation.set(Math.random(), Math.random(), Math.random());
+      cliff.scale.set(1, 0.6 + Math.random() * 0.8, 1);
+      cliff.castShadow = true;
+      scene.add(cliff);
+    }
+  }
+}
+
 function addBarrels(curve, wFn) {
   const bG = new THREE.CylinderGeometry(0.35,0.4,0.9,10);
   const bM = new THREE.MeshStandardMaterial({color:0xb04020, roughness:0.5, metalness:0.3});
@@ -979,6 +1063,123 @@ function addSnowTracks(curve, wFn) {
   const gR = buildRibbon(right, 1.2, 600);
   const mL = new THREE.Mesh(gL, edgeMat); mL.receiveShadow = true; scene.add(mL);
   const mR = new THREE.Mesh(gR, edgeMat); mR.receiveShadow = true; scene.add(mR);
+}
+
+function addBridge(curve, wFn) {
+  const bridgeMat = new THREE.MeshStandardMaterial({ color: 0x556677, roughness: 0.6, metalness: 0.4 });
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x8899aa, roughness: 0.5, metalness: 0.6 });
+  const pillarMat = new THREE.MeshStandardMaterial({ color: 0x667788, roughness: 0.7, metalness: 0.3 });
+
+  const bridgeStart = 0.45;
+  const bridgeEnd = 0.6;
+  const segs = 40;
+
+  const pos = [], idx = [], uv = [];
+  const posTop = [], idxTop = [], uvTop = [];
+
+  for (let i = 0; i <= segs; i++) {
+    const t = bridgeStart + (i / segs) * (bridgeEnd - bridgeStart);
+    const p = curve.getPointAt(t);
+    const tan = curve.getTangentAt(t).normalize();
+    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+    const w = wFn ? (trackWidth / 2 + 0.5) * wFn(t) : trackWidth / 2 + 0.5;
+
+    const L = p.clone().addScaledVector(n, -w);
+    const R = p.clone().addScaledVector(n, w);
+
+    pos.push(L.x, L.y - 0.3, L.z);
+    pos.push(R.x, R.y - 0.3, R.z);
+    uv.push(0, (t - bridgeStart) * 200);
+    uv.push(1, (t - bridgeStart) * 200);
+
+    posTop.push(L.x, L.y + 0.1, L.z);
+    posTop.push(R.x, R.y + 0.1, R.z);
+    uvTop.push(0, (t - bridgeStart) * 200);
+    uvTop.push(1, (t - bridgeStart) * 200);
+
+    if (i < segs) {
+      const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+      idx.push(a, c, b, b, c, d);
+      idxTop.push(a, c, b, b, c, d);
+    }
+  }
+
+  const sideGeo = new THREE.BufferGeometry();
+  const sidePos = [];
+  const sideIdx = [];
+  const sideUv = [];
+  for (let i = 0; i <= segs; i++) {
+    const t = bridgeStart + (i / segs) * (bridgeEnd - bridgeStart);
+    const p = curve.getPointAt(t);
+    const tan = curve.getTangentAt(t).normalize();
+    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+    const w = wFn ? (trackWidth / 2 + 0.5) * wFn(t) : trackWidth / 2 + 0.5;
+
+    for (let side = -1; side <= 1; side += 2) {
+      const bx = p.x + n.x * side * w;
+      const bz = p.z + n.z * side * w;
+      sidePos.push(bx, p.y - 0.3, bz);
+      sidePos.push(bx, p.y + 0.6, bz);
+      sideUv.push(0, (t - bridgeStart) * 200);
+      sideUv.push(1, (t - bridgeStart) * 200);
+    }
+    if (i < segs) {
+      const base = i * 4;
+      sideIdx.push(base, base + 4, base + 1, base + 1, base + 4, base + 5);
+      sideIdx.push(base + 2, base + 3, base + 6, base + 3, base + 7, base + 6);
+    }
+  }
+  sideGeo.setAttribute('position', new THREE.Float32BufferAttribute(sidePos, 3));
+  sideGeo.setAttribute('uv', new THREE.Float32BufferAttribute(sideUv, 2));
+  sideGeo.setIndex(sideIdx);
+  sideGeo.computeVertexNormals();
+
+  const sideL = new THREE.Mesh(sideGeo, railMat);
+  sideL.castShadow = true;
+  sideL.receiveShadow = true;
+  scene.add(sideL);
+
+  const pillarGeo = new THREE.BoxGeometry(0.8, 1, 0.8);
+  const pillarCount = 8;
+  for (let i = 0; i < pillarCount; i++) {
+    const t = bridgeStart + ((i + 0.5) / pillarCount) * (bridgeEnd - bridgeStart);
+    const p = curve.getPointAt(t);
+    const tan = curve.getTangentAt(t).normalize();
+    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+    const w = wFn ? (trackWidth / 2 + 0.3) * wFn(t) : trackWidth / 2 + 0.3;
+
+    for (let side = -1; side <= 1; side += 2) {
+      const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+      const pp = p.clone().addScaledVector(n, side * w);
+      const pillarHeight = p.y + 0.3;
+      pillar.scale.y = pillarHeight / 0.5;
+      pillar.position.set(pp.x, pillarHeight / 2 - 0.3, pp.z);
+      pillar.castShadow = true;
+      pillar.receiveShadow = true;
+      scene.add(pillar);
+    }
+  }
+
+  const crossBeamGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+  for (let i = 0; i < pillarCount - 1; i++) {
+    const t1 = bridgeStart + ((i + 0.5) / pillarCount) * (bridgeEnd - bridgeStart);
+    const t2 = bridgeStart + ((i + 1.5) / pillarCount) * (bridgeEnd - bridgeStart);
+    const p1 = curve.getPointAt(t1);
+    const p2 = curve.getPointAt(t2);
+    const tan = curve.getTangentAt((t1 + t2) / 2).normalize();
+    const n = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
+    const w = wFn ? (trackWidth / 2 + 0.3) * wFn((t1 + t2) / 2) : trackWidth / 2 + 0.3;
+
+    for (let side = -1; side <= 1; side += 2) {
+      const beam = new THREE.Mesh(crossBeamGeo, pillarMat);
+      const midY = (p1.y + p2.y) / 2;
+      const midX = (p1.x + p2.x) / 2 + n.x * side * w;
+      const midZ = (p1.z + p2.z) / 2 + n.z * side * w;
+      beam.position.set(midX, midY - 0.1, midZ);
+      beam.lookAt(p2.x + n.x * side * w, p2.y - 0.1, p2.z + n.z * side * w);
+      scene.add(beam);
+    }
+  }
 }
 
 function addFrozenLakes(curve, bound) {
