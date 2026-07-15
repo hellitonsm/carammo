@@ -9,6 +9,8 @@
 - Vetores Ammo pré-alocados (elimina GC pressure)
 - Cache de nearestOnCurve por frame
 - Vetores Three.js pré-alocados (_fwd, _up, _tan, etc.)
+- Lookahead múltiplo no estado da IA neural (3 pontos futuros)
+- Reset automático de carros fora da pista após 3s + penalidade de treinamento
 
 ### Fixed
 - Corrige action format: `selectAction()` agora retorna `{steering, throttle}` em vez de array
@@ -16,6 +18,9 @@
 - Corrige reward de progresso: wrap-around para pistas circulares (progress > 0.5)
 - Corrige stuck detection: timer aumentado para 4s, simplificado para `speedMs < 2.0`
 - Corrige dunas invadindo a pista no deserto (distância mínima verificada)
+- Corrige spawn dos carros na pista com chão colisionável
+- Eleva chão visual para y=0 alinhando com a pista
+- Reduz árvores na floresta de 450 para 50 (desempenho)
 
 ### Changed
 - Treinamento: frequência de 4→10 frames, save a cada 1000 frames

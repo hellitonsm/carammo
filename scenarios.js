@@ -112,7 +112,7 @@ export const SCENES = {
     trackColor: 0x2c2c2c, trackFriction: 0.88, trackWidth: 12,
     trackWearMarks: true,
     // Vegetação
-    treeCount: 450, treeDensity: 14, treeTrunkColor: 0x6b4423,
+    treeCount: 50, treeDensity: 14, treeTrunkColor: 0x6b4423,
     treeType: 'pine',
     // Objetos
     hasLamps: true, lampSpacing: 32,
