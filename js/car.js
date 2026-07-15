@@ -125,7 +125,7 @@ export function createVehicle(colorHex, startIdx = 0, isPlayer = false, name = '
   return {
     mesh, body, vehicle: veh, wheels, color: colorHex, isPlayer, name,
     progress: 0, lap: 0, lastT: 0, lastLap: 0, finished: false, finishTime: 0,
-    aiSkill: skill, aiState: { steer: 0, accel: 0, lookahead: 35 + Math.random() * 10, error: 0, errorTimer: 0, stuckTimer: 0 },
+    aiSkill: skill, aiState: { steer: 0, accel: 0, lookahead: 35 + Math.random() * 10, error: 0, errorTimer: 0, stuckTimer: 0, offTrackTimer: 0 },
     ramp: 0, startP, startDir: curveTan.clone(),
   };
 }

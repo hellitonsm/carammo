@@ -155,16 +155,27 @@ function updateNeuralAI(v, dt, currentFrame) {
   const nr = getCachedNearest(v, currentFrame);
   const distFromTrack = nr.dist;
 
+  // Off-track timer: punish cars that leave the track for too long
+  if (distFromTrack > trackWidth) {
+    v.aiState.offTrackTimer += dt;
+  } else {
+    v.aiState.offTrackTimer = 0;
+  }
+
   if (_up.y < 0.3 || v.mesh.position.y < -10 || distFromTrack > trackWidth * 3) {
     rlAgent.remember(state, action, -500, collectCarState(v, currentFrame), true);
     resetVehicle(v, false);
-    v.aiState.stuckTimer = 0; v.aiState.prevProgress = 0;
+    v.aiState.stuckTimer = 0; v.aiState.prevProgress = 0; v.aiState.offTrackTimer = 0;
+  } else if (v.aiState.offTrackTimer > 3.0) {
+    rlAgent.remember(state, action, -300, collectCarState(v, currentFrame), true);
+    resetVehicle(v, false);
+    v.aiState.stuckTimer = 0; v.aiState.prevProgress = 0; v.aiState.offTrackTimer = 0;
   } else if (speedMs > 5) {
     v.aiState.stuckTimer = 0;
   } else if (v.aiState.stuckTimer > 4.0 && speedMs < 2.0) {
     rlAgent.remember(state, action, -200, collectCarState(v, currentFrame), true);
     resetVehicle(v, false);
-    v.aiState.stuckTimer = 0; v.aiState.prevProgress = 0;
+    v.aiState.stuckTimer = 0; v.aiState.prevProgress = 0; v.aiState.offTrackTimer = 0;
   }
   v.aiState.prevSpeed = speedMs;
 }
@@ -224,8 +235,19 @@ function updateRuleBasedAI(v, dt) {
   ai.stuckTimer = (ai.stuckTimer || 0) + dt;
   _up.set(0, 1, 0).applyQuaternion(v.mesh.quaternion);
   const distFromTrack = nearestOnCurve(trackCurve, v.mesh.position).dist;
+
+  // Off-track timer: reset cars that leave the track for too long
+  if (distFromTrack > trackWidth) {
+    ai.offTrackTimer = (ai.offTrackTimer || 0) + dt;
+  } else {
+    ai.offTrackTimer = 0;
+  }
+
   if (_up.y < 0.3 || v.mesh.position.y < -10 || distFromTrack > trackWidth * 3) {
-    resetVehicle(v, false); ai.stuckTimer = 0;
+    resetVehicle(v, false); ai.stuckTimer = 0; ai.offTrackTimer = 0;
+  }
+  else if (ai.offTrackTimer > 3.0) {
+    resetVehicle(v, false); ai.stuckTimer = 0; ai.offTrackTimer = 0;
   }
   else if (speedMs > 5) {
     ai.stuckTimer = 0;
@@ -332,9 +354,15 @@ function calculateReward(v, prevProgress, frameNum) {
   // Staying on track (use cached nearest)
   const distFromTrack = getCachedNearest(v, frameNum).dist;
   const trackHalf = trackWidth / 2;
-  if (distFromTrack < trackHalf) reward += 2;
-  else if (distFromTrack < trackWidth) reward -= 3;
-  else reward -= 15;
+  if (distFromTrack < trackHalf) {
+    reward += 2;
+  } else if (distFromTrack < trackWidth) {
+    reward -= 3;
+  } else {
+    // Heavy escalating penalty the longer the car stays off-track
+    const offTrackTime = v.aiState.offTrackTimer || 0;
+    reward -= 15 + offTrackTime * 40;
+  }
 
   // Orientation penalty
   _up.set(0, 1, 0).applyQuaternion(v.mesh.quaternion);
