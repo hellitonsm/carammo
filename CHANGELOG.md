@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## 0.5 — 2026-07-17
+
+### Added
+- **2 novos cenários jogáveis**: Litoral (praia, palmeiras, píer e barcos) e Metrópole (noite urbana, prédios, outdoors)
+- **Modo Campeonato**: 5 rodadas (Floresta → Deserto → Litoral → Metrópole → Nevasca), pontuação F1-style (25-18-15-12-10…), prêmios por rodada + bolsa final
+- **Banner de campeonato** no menu com rodada atual, seus pontos e último resultado
+- **Carros da loja com mesh 3D distinto por tier** (starter/street/sport/super/hyper) — cada carro com silhueta própria (hatch, cupê, GT, supercarro, hypercar), asas, saias, entradas laterais
+- **IA usa carros com estilos diferentes** (`AI_CAR_IDS`: street/sport/super/hyper) em vez de todos iguais
+- **Ambiente costeiro**: dunas, sinais, píer de madeira com pilares e barcos com velas
+- **Ambiente urbano**: 45 prédios com janelas emissivas, outdoors e sinais
+- **Palmeiras instanciadas** no Litoral (folhas via InstancedMesh)
+- Separação de botões: "Corrida Rápida" e "🏆 Campeonato (5 rodadas)"
+
+### Changed
+- README atualizado: 5 cenários, seção de Campeonato, aparência 3D dos carros
+- Cenário Floresta: "overpass" → colina, descrição ajustada
+- `buildCarMesh` agora recebe `carId` e resolve o estilo via tabela `BODY_STYLES`
+- Menu bloqueia seleção de pista durante campeonato (cenas travadas por rodada)
+
 ### Added
 - **RMSProp optimizer** na rede neural — adapta taxa de aprendizado por peso, evita gradientes que explodem/desaparecem
 - **Ruído Gaussiano (Box-Muller)** na exploração — substitui epsilon-greedy discreto por perturbação contínua suave nas ações
@@ -100,21 +119,4 @@
 - Estrutura inicial do jogo
 - README com documentação
 
-## 0.5 — 2026-07-17
 
-### Added
-- **2 novos cenários jogáveis**: Litoral (praia, palmeiras, píer e barcos) e Metrópole (noite urbana, prédios, outdoors)
-- **Modo Campeonato**: 5 rodadas (Floresta → Deserto → Litoral → Metrópole → Nevasca), pontuação F1-style (25-18-15-12-10…), prêmios por rodada + bolsa final
-- **Banner de campeonato** no menu com rodada atual, seus pontos e último resultado
-- **Carros da loja com mesh 3D distinto por tier** (starter/street/sport/super/hyper) — cada carro com silhueta própria (hatch, cupê, GT, supercarro, hypercar), asas, saias, entradas laterais
-- **IA usa carros com estilos diferentes** (`AI_CAR_IDS`: street/sport/super/hyper) em vez de todos iguais
-- **Ambiente costeiro**: dunas, sinais, píer de madeira com pilares e barcos com velas
-- **Ambiente urbano**: 45 prédios com janelas emissivas, outdoors e sinais
-- **Palmeiras instanciadas** no Litoral (folhas via InstancedMesh)
-- Separação de botões: "Corrida Rápida" e "🏆 Campeonato (5 rodadas)"
-
-### Changed
-- README atualizado: 5 cenários, seção de Campeonato, aparência 3D dos carros
-- Cenário Floresta: "overpass" → colina, descrição ajustada
-- `buildCarMesh` agora recebe `carId` e resolve o estilo via tabela `BODY_STYLES`
-- Menu bloqueia seleção de pista durante campeonato (cenas travadas por rodada)
