@@ -100,7 +100,7 @@
 - Estrutura inicial do jogo
 - README com documentação
 
-## 1.2.0 — 2026-07-17
+## 0.5 — 2026-07-17
 
 ### Added
 - **2 novos cenários jogáveis**: Litoral (praia, palmeiras, píer e barcos) e Metrópole (noite urbana, prédios, outdoors)
