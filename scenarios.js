@@ -1,6 +1,6 @@
 // Closed non-self-intersecting loops (centerline clearance >> trackWidth).
-// Start near south, racing counter-clockwise (+Z then +X).
-// FOREST: large oval with elevated north ridge.
+// Start near south, racing counter-clockwise.
+
 export const FOREST_POINTS = [
   [100, 0, -70],
   [150, 0, -55],
@@ -20,7 +20,6 @@ export const FOREST_POINTS = [
   [85, 0, -70],
 ];
 
-// DESERT: elongated oval, mild undulation.
 export const DESERT_POINTS = [
   [110, 0, -55],
   [168, 0, -42],
@@ -38,7 +37,6 @@ export const DESERT_POINTS = [
   [55, 0, -55],
 ];
 
-// SNOW: wide oval, mountain climb on north-east, bridge-friendly high section.
 export const SNOW_POINTS = [
   [105, 0, -60],
   [155, 0, -45],
@@ -55,6 +53,42 @@ export const SNOW_POINTS = [
   [5, 0, -25],
   [35, 0, -48],
   [70, 0, -62],
+];
+
+// Coast: seaside loop, mild undulation
+export const COAST_POINTS = [
+  [100, 0, -65],
+  [150, 0, -55],
+  [190, 0, -30],
+  [215, 0, 5],
+  [215, 0.3, 40],
+  [190, 0.5, 70],
+  [150, 0.3, 85],
+  [100, 0, 90],
+  [50, 0, 85],
+  [15, 0, 60],
+  [-5, 0.2, 25],
+  [-5, 0, -10],
+  [20, 0, -40],
+  [55, 0, -60],
+];
+
+// City: night street circuit
+export const CITY_POINTS = [
+  [90, 0, -55],
+  [140, 0, -48],
+  [175, 0, -25],
+  [195, 0, 5],
+  [195, 0, 40],
+  [170, 0, 70],
+  [130, 0, 85],
+  [85, 0, 85],
+  [40, 0, 70],
+  [10, 0, 40],
+  [-5, 0, 5],
+  [5, 0, -25],
+  [35, 0, -48],
+  [65, 0, -55],
 ];
 
 export const SCENES = {
@@ -218,7 +252,130 @@ export const SCENES = {
     particles: 'snow',
     points: SNOW_POINTS,
   },
+  coast: {
+    id: 'coast',
+    name: 'Litoral',
+    emoji: '🏖️',
+    skyTop: 0x3a8fd4,
+    skyBottom: 0xc8e8f8,
+    fogColor: 0xb0d4e8,
+    fogDensity: 0.0014,
+    sunColor: 0xfff5d0,
+    sunIntensity: 1.45,
+    sunAz: 100,
+    sunEl: 55,
+    ambientColor: 0xffffff,
+    ambientInt: 0.4,
+    hemiSky: 0x87ceeb,
+    hemiGround: 0xc2b280,
+    hemiInt: 0.55,
+    exposure: 1.15,
+    groundColor: 0xc2b280,
+    groundTex: 'sand',
+    trackColor: 0x3a3a3a,
+    trackFriction: 0.84,
+    trackWidth: 12,
+    treeType: 'palm',
+    treeCount: 80,
+    treeDensity: 15,
+    hasLamps: true,
+    lampSpacing: 40,
+    hasBarriers: true,
+    barrierColor: 0xf0c040,
+    rumbleColorA: 0xf0c040,
+    rumbleColorB: 0xffffff,
+    hasCones: true,
+    conesEvery: 20,
+    hasRocks: true,
+    rockCount: 70,
+    rockColor: 0x8a7a6a,
+    hasFlowers: false,
+    hasSigns: true,
+    hasSheds: false,
+    hasDunes: true,
+    duneCount: 40,
+    hasBarrels: false,
+    hasTumbleweeds: false,
+    hasSnowPiles: false,
+    hasSnowmen: false,
+    hasIcePatches: false,
+    snowParticles: false,
+    hasPalms: true,
+    hasPier: true,
+    hasBoats: true,
+    dustColor: 0xd8c8a0,
+    dustAlpha: 0.4,
+    widthVariation: 1,
+    particles: null,
+    points: COAST_POINTS,
+  },
+  city: {
+    id: 'city',
+    name: 'Metrópole',
+    emoji: '🌃',
+    skyTop: 0x0a0a1a,
+    skyBottom: 0x1a2040,
+    fogColor: 0x151828,
+    fogDensity: 0.0022,
+    sunColor: 0xa0b0ff,
+    sunIntensity: 0.55,
+    sunAz: 200,
+    sunEl: 25,
+    ambientColor: 0x4050a0,
+    ambientInt: 0.45,
+    hemiSky: 0x3040a0,
+    hemiGround: 0x222230,
+    hemiInt: 0.4,
+    exposure: 0.95,
+    groundColor: 0x2a2a32,
+    groundTex: 'asphalt',
+    trackColor: 0x1e1e24,
+    trackFriction: 0.9,
+    trackWidth: 11,
+    treeType: null,
+    treeCount: 0,
+    treeDensity: 20,
+    hasLamps: true,
+    lampSpacing: 22,
+    hasBarriers: true,
+    barrierColor: 0xcccccc,
+    rumbleColorA: 0xffcc00,
+    rumbleColorB: 0x111111,
+    hasCones: true,
+    conesEvery: 14,
+    hasRocks: false,
+    rockCount: 0,
+    rockColor: 0x555555,
+    hasFlowers: false,
+    hasSigns: true,
+    hasSheds: false,
+    hasDunes: false,
+    hasBarrels: false,
+    hasTumbleweeds: false,
+    hasSnowPiles: false,
+    hasSnowmen: false,
+    hasIcePatches: false,
+    snowParticles: false,
+    hasBuildings: true,
+    hasBillboards: true,
+    dustColor: 0x888888,
+    dustAlpha: 0.2,
+    widthVariation: 0,
+    particles: null,
+    points: CITY_POINTS,
+  },
 };
+
+/** Championship race order (5 rounds). */
+export const CHAMPIONSHIP_ROUNDS = [
+  { sceneId: 'forest', name: 'Rodada 1 — Floresta', laps: 3 },
+  { sceneId: 'desert', name: 'Rodada 2 — Deserto', laps: 3 },
+  { sceneId: 'coast', name: 'Rodada 3 — Litoral', laps: 3 },
+  { sceneId: 'city', name: 'Rodada 4 — Metrópole', laps: 3 },
+  { sceneId: 'snow', name: 'Rodada 5 — Nevasca', laps: 4 },
+];
+
+export const CHAMPIONSHIP_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
 
 export function widthFnFor(scn) {
   const W = scn.widthVariation || 0;
@@ -228,4 +385,8 @@ export function widthFnFor(scn) {
 
 export function getScene(id) {
   return SCENES[id];
+}
+
+export function listScenes() {
+  return Object.values(SCENES);
 }

@@ -71,6 +71,15 @@ export function makeGroundTexture(type) {
       ctx.fillStyle = `rgb(${180 + v * 50},${140 + v * 40},${70 + v * 40})`;
       ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
     }
+  } else if (type === 'asphalt') {
+    ctx.fillStyle = '#2a2a32';
+    ctx.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 5000; i++) {
+      const v = Math.random();
+      const g = 30 + v * 40;
+      ctx.fillStyle = `rgb(${g},${g},${g + 8})`;
+      ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+    }
   } else {
     // snow
     ctx.fillStyle = '#e8eef5';

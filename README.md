@@ -4,8 +4,13 @@ Jogo de corrida 3D usando **Three.js** + **Ammo.js**, com 3 cenários distintos,
 
 ## Funcionalidades
 
+### Campeonato
+- **5 rodadas** (Floresta → Deserto → Litoral → Metrópole → Nevasca)
+- Pontuação F1-style (25-18-15-12-10…), prêmios por rodada + bolsa final
+- Classificação persistente entre rodadas; botão **Próxima rodada** no pódio
+
 ### Sistema de Gerenciamento
-- **5 carros jogáveis** com tiers (D → S): Carammo GT, Viper RS, Falcon X, Phantom S, Titan SS
+- **5 carros jogáveis** com tiers (D → S) e **aparência 3D distinta** (hatch, cupê, GT, supercarro, hypercar): Carammo GT, Viper RS, Falcon X, Phantom S, Titan SS
 - **10 peças instaláveis** com árvore de pré-requisitos (Turbo, ECU, Spoiler, Pneus, etc.)
 - **Upgrades** de motor, aerodinâmica e pneus com nível máximo por carro
 - **Sistema de dano** — cada corrida desgasta motor, aero e pneus; reparo individual ou completo
@@ -14,10 +19,12 @@ Jogo de corrida 3D usando **Three.js** + **Ammo.js**, com 3 cenários distintos,
 - **Stats afetam gameplay** — motor → força, pneus → atrito, aero → downforce
 - **Overlay completo** com sidebar: Visão Geral, Garagem, Oficina, Loja de Carros, Loja de Peças
 
-### 3 Cenários jogáveis
-- **Floresta** — circuito clássico com vegetação densa, curvas largas, postes, barreiras vermelhas e asfalto escuro
-- **Deserto** — dunas ao fundo, céu de pôr-do-sol, atrito menor (mais derrapagem), cactos e poeira nos pneus
-- **Nevasca** — pista gelada com atrito baixo (drift!), partículas de neve em tempo real, pinheiros com ponta branca, longas retas, zebras azuis/brancas
+### 5 Cenários jogáveis
+- **Floresta** — circuito clássico com vegetação densa, colina, pinheiros
+- **Deserto** — dunas, céu de pôr-do-sol, atrito menor, cactos
+- **Litoral** — praia, palmeiras, píer e barcos
+- **Metrópole** — noite urbana, prédios e outdoors
+- **Nevasca** — gelo, ponte, baixa aderência, neve
 
 ### Pistas
 - CatmullRom com elevações, curvas de diferentes raios e retas longas

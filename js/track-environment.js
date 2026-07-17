@@ -60,11 +60,21 @@ export function buildEnvironment(scn, curve, bound, wFn) {
     addBridge(curve, scn, wFn);
     addFrozenLakes(curve, scn, wFn);
     if (scn.snowParticles) createSnowParticles();
+  } else if (scn.id === 'coast') {
+    addDunes(curve, scn, wFn);
+    addSigns(curve, scn, wFn);
+    addPier(curve, scn, wFn);
+    addBoats(curve, scn, wFn);
+  } else if (scn.id === 'city') {
+    addBuildings(curve, scn, wFn);
+    addBillboards(curve, scn, wFn);
+    addSigns(curve, scn, wFn);
   }
 }
 
 function placeTrees(scn, curve, wFn) {
   const scene = getScene();
+  if (!scn.treeType || !scn.treeCount) return;
   const count = scn.treeCount || 50;
   // Keep foliage well clear of the racing line
   const minClear = Math.max(scn.treeDensity || 14, scn.trackWidth / 2 + 6);
@@ -133,6 +143,47 @@ function placeTrees(scn, curve, wFn) {
       snowMesh2.instanceMatrix.needsUpdate = true;
       scene.add(snowMesh, snowMesh2);
     }
+  } else if (scn.treeType === 'palm') {
+    const trunkGeo = new THREE.CylinderGeometry(0.12, 0.22, 4.5, 7);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2a, roughness: 0.9 });
+    const leafGeo = new THREE.ConeGeometry(0.15, 2.2, 5);
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x2d8a3a, roughness: 0.8 });
+    const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
+    const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, count * 6);
+    const dummy = new THREE.Object3D();
+    let placed = 0;
+    let leafIdx = 0;
+    let attempts = 0;
+    while (placed < count && attempts < count * 20) {
+      attempts++;
+      const s = sampleOutside(curve, scn, wFn, minClear, minClear + 50);
+      if (!s) continue;
+      const scale = 0.8 + Math.random() * 1.4;
+      dummy.position.set(s.x, s.y + 2.25 * scale, s.z);
+      dummy.scale.set(scale, scale, scale);
+      dummy.rotation.y = Math.random() * Math.PI;
+      dummy.updateMatrix();
+      trunkMesh.setMatrixAt(placed, dummy.matrix);
+      for (let L = 0; L < 6 && leafIdx < count * 6; L++) {
+        const ang = (L / 6) * Math.PI * 2;
+        dummy.position.set(
+          s.x + Math.cos(ang) * 0.4 * scale,
+          s.y + 4.3 * scale,
+          s.z + Math.sin(ang) * 0.4 * scale
+        );
+        dummy.scale.set(scale * 0.9, scale * 0.7, scale * 0.9);
+        dummy.rotation.set(0.9, ang, 0);
+        dummy.updateMatrix();
+        leafMesh.setMatrixAt(leafIdx++, dummy.matrix);
+      }
+      placed++;
+    }
+    trunkMesh.count = placed;
+    leafMesh.count = leafIdx;
+    trunkMesh.instanceMatrix.needsUpdate = true;
+    leafMesh.instanceMatrix.needsUpdate = true;
+    trunkMesh.castShadow = true;
+    scene.add(trunkMesh, leafMesh);
   } else if (scn.treeType === 'cactus') {
     const bodyGeo = new THREE.CylinderGeometry(0.25, 0.3, 2.5, 8);
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2d7a3a, roughness: 0.8 });
@@ -747,6 +798,136 @@ function addFrozenLakes(curve, scn, wFn) {
     lake.position.set(s.x, s.y - 0.3, s.z);
     scene.add(lake);
     placed++;
+  }
+}
+
+function addPier(curve, scn, wFn) {
+  const scene = getScene();
+  const wood = new THREE.MeshStandardMaterial({ color: 0x8b6914, roughness: 0.9 });
+  const s = sampleOutside(curve, scn, wFn, 30, 45, {
+    t: 0.2, side: 1, maxAttempts: 15, avoidStart: 30,
+  });
+  if (!s) return;
+  // Deck
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(6, 0.25, 28), wood);
+  deck.position.set(s.x, s.y + 0.6, s.z);
+  deck.rotation.y = Math.atan2(s.tan.x, s.tan.z);
+  scene.add(deck);
+  // Pillars under pier
+  for (let i = 0; i < 6; i++) {
+    for (const side of [-1, 1]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 1.4, 6), wood);
+      const along = (i - 2.5) * 4;
+      post.position.set(
+        s.x + s.tan.x * along + s.nx * side * 2.2,
+        s.y + 0.1,
+        s.z + s.tan.z * along + s.nz * side * 2.2
+      );
+      scene.add(post);
+    }
+  }
+}
+
+function addBoats(curve, scn, wFn) {
+  const scene = getScene();
+  const hullMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0.2 });
+  const sailMat = new THREE.MeshStandardMaterial({ color: 0xe8e0d0, roughness: 0.8, side: THREE.DoubleSide });
+  for (let i = 0; i < 5; i++) {
+    const s = sampleOutside(curve, scn, wFn, 40, 70, {
+      t: (i + 0.5) / 5, maxAttempts: 12, avoidStart: 40,
+    });
+    if (!s) continue;
+    const g = new THREE.Group();
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 3.5), hullMat);
+    hull.position.y = 0.2;
+    g.add(hull);
+    const mast = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.06, 3.2, 6),
+      new THREE.MeshStandardMaterial({ color: 0x5a4030 })
+    );
+    mast.position.y = 1.8;
+    g.add(mast);
+    const sail = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 2.2), sailMat);
+    sail.position.set(0.4, 1.9, 0);
+    g.add(sail);
+    g.position.set(s.x, s.y - 0.4, s.z);
+    g.rotation.y = Math.random() * Math.PI * 2;
+    scene.add(g);
+  }
+}
+
+function addBuildings(curve, scn, wFn) {
+  const scene = getScene();
+  const colors = [0x2a2a40, 0x1e2840, 0x303050, 0x252538, 0x3a3050];
+  const windowMat = new THREE.MeshStandardMaterial({
+    color: 0xffee88,
+    emissive: 0xffcc44,
+    emissiveIntensity: 0.6,
+  });
+  let placed = 0;
+  for (let i = 0; i < 120 && placed < 45; i++) {
+    const s = sampleOutside(curve, scn, wFn, 16, 55, { maxAttempts: 6 });
+    if (!s) continue;
+    const w = 4 + Math.random() * 8;
+    const d = 4 + Math.random() * 8;
+    const h = 8 + Math.random() * 28;
+    if (s.clear < Math.max(w, d) * 0.55) continue;
+    const mat = new THREE.MeshStandardMaterial({
+      color: colors[placed % colors.length],
+      roughness: 0.85,
+      metalness: 0.15,
+    });
+    const building = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    building.position.set(s.x, s.y + h / 2, s.z);
+    building.castShadow = true;
+    building.receiveShadow = true;
+    scene.add(building);
+    // Windows strip
+    if (Math.random() > 0.35) {
+      const floors = Math.floor(h / 3);
+      for (let f = 1; f < floors; f++) {
+        if (Math.random() > 0.55) continue;
+        const win = new THREE.Mesh(
+          new THREE.BoxGeometry(w * 0.7, 0.5, 0.08),
+          windowMat
+        );
+        win.position.set(s.x, s.y + f * 3, s.z + d / 2 + 0.05);
+        scene.add(win);
+      }
+    }
+    placed++;
+  }
+}
+
+function addBillboards(curve, scn, wFn) {
+  const scene = getScene();
+  const colors = [0xff3366, 0x33aaff, 0xffcc00, 0x66ff99, 0xff66ff];
+  for (let i = 0; i < 8; i++) {
+    const t = (i + 0.2) / 8;
+    const side = i % 2 === 0 ? 1 : -1;
+    const s = sampleOutside(curve, scn, wFn, 8, 14, {
+      t, side, maxAttempts: 10, avoidStart: 20,
+    });
+    if (!s) continue;
+    const post = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.12, 5, 6),
+      new THREE.MeshStandardMaterial({ color: 0x444450, metalness: 0.6 })
+    );
+    post.position.set(s.x, s.y + 2.5, s.z);
+    scene.add(post);
+    const board = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 2.2, 0.15),
+      new THREE.MeshStandardMaterial({
+        color: colors[i % colors.length],
+        emissive: colors[i % colors.length],
+        emissiveIntensity: 0.35,
+        roughness: 0.4,
+      })
+    );
+    board.position.set(s.x, s.y + 5.2, s.z);
+    const p = curve.getPointAt(t);
+    board.lookAt(p.x, s.y + 5.2, p.z);
+    scene.add(board);
   }
 }
 

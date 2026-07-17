@@ -43,12 +43,22 @@
         <button class="scene-option" data-scene="forest" type="button">
           <div class="scene-thumb">🌲</div>
           <span class="scene-name">Floresta</span>
-          <span class="scene-desc">Asfalto · overpass · pinheiros</span>
+          <span class="scene-desc">Asfalto · colina · pinheiros</span>
         </button>
         <button class="scene-option" data-scene="desert" type="button">
           <div class="scene-thumb">🏜️</div>
           <span class="scene-name">Deserto</span>
           <span class="scene-desc">Areia · cânions · cactos</span>
+        </button>
+        <button class="scene-option" data-scene="coast" type="button">
+          <div class="scene-thumb">🏖️</div>
+          <span class="scene-name">Litoral</span>
+          <span class="scene-desc">Praia · palmeiras · píer</span>
+        </button>
+        <button class="scene-option" data-scene="city" type="button">
+          <div class="scene-thumb">🌃</div>
+          <span class="scene-name">Metrópole</span>
+          <span class="scene-desc">Noite · prédios · outdoor</span>
         </button>
         <button class="scene-option" data-scene="snow" type="button">
           <div class="scene-thumb">❄️</div>
@@ -56,6 +66,8 @@
           <span class="scene-desc">Gelo · ponte · baixa aderência</span>
         </button>
       </div>
+
+      <div id="champ-banner" class="champ-banner" hidden></div>
 
       <div class="section-title">Opções</div>
       <div class="options-row">
@@ -69,7 +81,10 @@
         <button id="reset-ai-btn" class="btn small" type="button">Resetar IA</button>
       </div>
 
-      <button id="start-btn" class="btn primary" type="button" disabled>Iniciar Corrida</button>
+      <div class="race-mode-row">
+        <button id="start-btn" class="btn primary" type="button" disabled>Corrida Rápida</button>
+        <button id="champ-start-btn" class="btn btn-champ" type="button">🏆 Campeonato (5 rodadas)</button>
+      </div>
 
       <div class="menu-footer-actions">
         <button class="btn btn-small btn-danger" data-action="reset-save" type="button">Resetar Save</button>

@@ -36,6 +36,14 @@ function defaultState() {
     wins: 0,
     totalEarnings: 0,
     totalSpent: 0,
+    championship: {
+      active: false,
+      round: 0,
+      standings: {}, // name -> points
+      playerPoints: 0,
+      results: [], // per-round { sceneId, playerPos, points, prize }
+      finished: false,
+    },
   };
 }
 
@@ -51,6 +59,9 @@ export function loadManager() {
       if (!state.installedParts) state.installedParts = {};
       if (!state.totalEarnings) state.totalEarnings = 0;
       if (!state.totalSpent) state.totalSpent = 0;
+      if (!state.championship) {
+        state.championship = defaultState().championship;
+      }
       for (const id of state.ownedCars) {
         if (!state.upgrades[id]) state.upgrades[id] = { motor: 0, aero: 0, pneus: 0 };
         if (!state.damage[id]) state.damage[id] = { motor: 0, aero: 0, pneus: 0 };
@@ -313,3 +324,115 @@ export function getInstalledParts(carId) {
   const ids = s.installedParts[carId || s.activeCar] || [];
   return ids.map(id => PARTS_SHOP.find(p => p.id === id)).filter(Boolean);
 }
+
+// ── Championship ──────────────────────────────────────────
+
+const CHAMP_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+const CHAMP_PRIZES = [8000, 5000, 3500, 2000, 1000]; // per-round prize boost by pos
+const CHAMP_AI = ['Rocket', 'Flash', 'Shadow', 'Blaze'];
+
+export function getChampionship() {
+  return getState().championship;
+}
+
+export function isChampionshipActive() {
+  const c = getChampionship();
+  return !!(c && c.active && !c.finished);
+}
+
+export function startChampionship() {
+  const s = getState();
+  s.championship = {
+    active: true,
+    round: 0,
+    standings: { Você: 0 },
+    playerPoints: 0,
+    results: [],
+    finished: false,
+  };
+  for (const name of CHAMP_AI) s.championship.standings[name] = 0;
+  saveManager();
+  return s.championship;
+}
+
+export function abandonChampionship() {
+  const s = getState();
+  s.championship = defaultState().championship;
+  saveManager();
+}
+
+export function getChampionshipRoundIndex() {
+  return getChampionship().round || 0;
+}
+
+/**
+ * Record end of a championship race.
+ * @param {number} playerPos 0-based finishing position
+ * @param {Array<{name:string,isPlayer:boolean}>} ranks ordered standings
+ * @param {string} sceneId
+ * @returns {{ points: number, prize: number, finished: boolean, standings: object }}
+ */
+export function recordChampionshipResult(playerPos, ranks, sceneId) {
+  const s = getState();
+  const champ = s.championship;
+  if (!champ || !champ.active) return null;
+
+  // Award points to all ranked racers present
+  ranks.forEach((r, idx) => {
+    const pts = CHAMP_POINTS[idx] || 0;
+    if (!champ.standings[r.name]) champ.standings[r.name] = 0;
+    champ.standings[r.name] += pts;
+  });
+  champ.playerPoints = champ.standings['Você'] || 0;
+
+  const points = CHAMP_POINTS[playerPos] || 0;
+  // Prize: base race prize already via addPrize; championship bonus
+  const bonus = CHAMP_PRIZES[playerPos] || 400;
+  s.money += bonus;
+  s.totalEarnings += bonus;
+
+  champ.results.push({
+    sceneId,
+    playerPos,
+    points,
+    prize: bonus,
+    round: champ.round,
+  });
+
+  champ.round += 1;
+  // 5 rounds
+  if (champ.round >= 5) {
+    champ.finished = true;
+    champ.active = false;
+    // Final purse based on overall rank
+    const board = getChampionshipBoard();
+    const overall = board.findIndex((e) => e.name === 'Você');
+    const finalPurse = [15000, 9000, 5000, 2500, 1000][overall] || 500;
+    s.money += finalPurse;
+    s.totalEarnings += finalPurse;
+    champ.finalPurse = finalPurse;
+    champ.finalPlace = overall;
+  }
+
+  saveManager();
+  return {
+    points,
+    prize: bonus,
+    finished: champ.finished,
+    standings: { ...champ.standings },
+    finalPurse: champ.finalPurse,
+    finalPlace: champ.finalPlace,
+  };
+}
+
+export function getChampionshipBoard() {
+  const champ = getChampionship();
+  const entries = Object.entries(champ.standings || {}).map(([name, pts]) => ({ name, pts }));
+  entries.sort((a, b) => b.pts - a.pts);
+  return entries;
+}
+
+export function getChampPointsTable() {
+  return CHAMP_POINTS;
+}
+

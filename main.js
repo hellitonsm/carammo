@@ -42,7 +42,10 @@ import {
   applyRaceDamage, buyCar, selectCar, sellCar, addPrize, getMoney,
   getEngineForceMultiplier, saveManager, resetManager, colorHex,
   getDamagePercent, getInstalledParts, canBuyPart, buyPart,
+  startChampionship, abandonChampionship, isChampionshipActive,
+  getChampionship, getChampionshipBoard, getChampionshipRoundIndex,
 } from './js/manager.js';
+import { CHAMPIONSHIP_ROUNDS, getScene as getSceneDef } from './scenarios.js';
 
 let ammoLoaded = false;
 let animStarted = false;
@@ -50,6 +53,10 @@ let animStarted = false;
 const AI_COLORS = [0x9c27b0, 0xff9800, 0x00bcd4, 0xe91e63];
 const AI_NAMES = ['Rocket', 'Flash', 'Shadow', 'Blaze'];
 const AI_SKILLS = [0.82, 0.88, 0.93, 0.78];
+const AI_CAR_IDS = ['street', 'sport', 'super', 'hyper'];
+
+let raceMode = 'quick'; // 'quick' | 'championship'
+
 
 async function main() {
   loadManager();
@@ -72,11 +79,21 @@ async function main() {
   createSkidMarks();
 
   window.addEventListener('carammo-restart', () => {
+    if (raceMode === 'championship') return; // no free restart mid-champ
     setupRace();
     startCountdown();
   });
   window.addEventListener('carammo-menu', () => {
+    if (isChampionshipActive()) {
+      // abandoning mid-championship
+      abandonChampionship();
+      raceMode = 'quick';
+      CFG.raceLaps = 3;
+    }
     goToMenu();
+  });
+  window.addEventListener('carammo-champ-next', () => {
+    continueChampionship();
   });
 
   refreshMenuHeader();
@@ -159,14 +176,7 @@ function updateAIStatus() {
 }
 
 function bindMenu() {
-  document.querySelectorAll('.scene-option').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.scene-option').forEach((b) => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      setSelectedScene(btn.dataset.scene);
-      updateStartButton();
-    });
-  });
+  bindSceneButtons();
   const forestBtn = document.querySelector('.scene-option[data-scene="forest"]');
   if (forestBtn) forestBtn.classList.add('selected');
 
@@ -196,6 +206,13 @@ function bindMenu() {
   const startBtn = document.getElementById('start-btn');
   if (startBtn) {
     startBtn.addEventListener('click', () => {
+      if (isChampionshipActive()) {
+        // resume current championship round
+        continueChampionship();
+        return;
+      }
+      raceMode = 'quick';
+      CFG.raceLaps = 3;
       document.getElementById('menu').hidden = true;
       document.getElementById('hud').hidden = false;
       const results = document.getElementById('race-results');
@@ -215,7 +232,99 @@ function bindMenu() {
       openManagerOverlay();
     });
   }
+
+  const champBtn = document.getElementById('champ-start-btn');
+  if (champBtn) {
+    champBtn.addEventListener('click', () => {
+      if (!ammoLoaded) return;
+      startChampionshipFlow();
+    });
+  }
+
+  refreshChampBanner();
 }
+
+function bindSceneButtons() {
+  document.querySelectorAll('.scene-option').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (isChampionshipActive()) return; // locked during championship
+      document.querySelectorAll('.scene-option').forEach((b) => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      setSelectedScene(btn.dataset.scene);
+      updateStartButton();
+    });
+  });
+}
+
+function startChampionshipFlow() {
+  startChampionship();
+  raceMode = 'championship';
+  const round = CHAMPIONSHIP_ROUNDS[0];
+  setSelectedScene(round.sceneId);
+  CFG.raceLaps = round.laps || 3;
+  // lock UI selection
+  document.querySelectorAll('.scene-option').forEach((b) => {
+    b.classList.toggle('selected', b.dataset.scene === round.sceneId);
+    b.classList.add('locked');
+  });
+  refreshChampBanner();
+  document.getElementById('menu').hidden = true;
+  document.getElementById('hud').hidden = false;
+  const results = document.getElementById('race-results');
+  if (results) results.hidden = true;
+  setupRace();
+  startCountdown();
+  if (!animStarted) {
+    animStarted = true;
+    animate();
+  }
+}
+
+function continueChampionship() {
+  if (!isChampionshipActive()) {
+    goToMenu();
+    return;
+  }
+  const idx = getChampionshipRoundIndex();
+  const round = CHAMPIONSHIP_ROUNDS[idx];
+  if (!round) {
+    goToMenu();
+    return;
+  }
+  raceMode = 'championship';
+  setSelectedScene(round.sceneId);
+  CFG.raceLaps = round.laps || 3;
+  document.querySelectorAll('.scene-option').forEach((b) => {
+    b.classList.toggle('selected', b.dataset.scene === round.sceneId);
+  });
+  document.getElementById('menu').hidden = true;
+  document.getElementById('hud').hidden = false;
+  setupRace();
+  startCountdown();
+}
+
+function refreshChampBanner() {
+  const el = document.getElementById('champ-banner');
+  if (!el) return;
+  if (isChampionshipActive()) {
+    const idx = getChampionshipRoundIndex();
+    const round = CHAMPIONSHIP_ROUNDS[idx];
+    const board = getChampionshipBoard();
+    const you = board.find((e) => e.name === 'Você');
+    el.hidden = false;
+    el.innerHTML = `<strong>Campeonato</strong> · Rodada ${idx + 1}/5${round ? ' — ' + round.name : ''} · Seus pts: <strong>${you ? you.pts : 0}</strong>`;
+  } else {
+    const c = getChampionship();
+    if (c && c.finished && c.results && c.results.length) {
+      el.hidden = false;
+      el.innerHTML = `Último campeonato: <strong>${(c.finalPlace ?? 0) + 1}º lugar</strong> · Bolsa $${(c.finalPurse || 0).toLocaleString()}`;
+    } else {
+      el.hidden = true;
+      el.innerHTML = '';
+    }
+  }
+}
+
 
 function bindManagerOverlay() {
   const closeBtn = document.getElementById('close-manager-btn');
@@ -589,6 +698,7 @@ function renderCarShop(s) {
           <div class="mgr-shop-card-info">
             <h4>${def.name}</h4>
             <p class="mgr-car-desc">${def.desc}</p>
+            <p class="mgr-car-style">Visual: <em>${styleLabel(def.id)}</em></p>
           </div>
         </div>
         <div class="mgr-shop-card-stats">
@@ -682,6 +792,16 @@ function renderMiniBar(label, value, max, cls) {
   `;
 }
 
+function styleLabel(id) {
+  return ({
+    starter: 'Hatch GT compacto',
+    street: 'Cupê esportivo',
+    sport: 'GT com asa e saias',
+    super: 'Supercarro asa alta',
+    hyper: 'Hypercar cunha / wing',
+  })[id] || id;
+}
+
 function showToast(msg, type = 'success') {
   let container = document.getElementById('toast-container');
   if (!container) {
@@ -762,12 +882,19 @@ function setupRace() {
 
   const activeDef = getActiveCarDef();
   setSelectedCarColor(activeDef.color);
-  const player = createVehicle(activeDef.color, 0, true, 'Você', 1.0);
+  const player = createVehicle(activeDef.color, 0, true, 'Você', 1.0, activeDef.id);
   addVehicle(player);
 
   if (getAiEnabled()) {
     for (let i = 0; i < 4; i++) {
-      const ai = createVehicle(AI_COLORS[i], i + 1, false, AI_NAMES[i], AI_SKILLS[i]);
+      const ai = createVehicle(
+        AI_COLORS[i],
+        i + 1,
+        false,
+        AI_NAMES[i],
+        AI_SKILLS[i],
+        AI_CAR_IDS[i]
+      );
       addVehicle(ai);
     }
   }
@@ -790,6 +917,12 @@ function goToMenu() {
   pauseAudio();
   updateAIStatus();
   refreshMenuHeader();
+  raceMode = isChampionshipActive() ? 'championship' : 'quick';
+  if (!isChampionshipActive()) {
+    CFG.raceLaps = 3;
+    document.querySelectorAll('.scene-option').forEach((b) => b.classList.remove('locked'));
+  }
+  refreshChampBanner();
 }
 
 main().catch((err) => {
