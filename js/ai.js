@@ -257,12 +257,13 @@ function collectCarState(v, frame) {
   state[8] = (dists[0] || 100) / 100;
   state[9] = (dists[1] || 100) / 100;
   state[10] = (dists[2] || 100) / 100;
-  state[11] = 0;
+  const localVel = getLocalVelocity(v);
+  state[11] = Math.max(-1, Math.min(1, localVel.x / 20));
 
   return state;
 }
 
-function calculateReward(v, prevProgress, frame) {
+function calculateReward(v, prevProgress, action, frame) {
   let reward = 0;
   const curve = getTrackCurve();
   const trackW = getTrackWidth();
@@ -303,6 +304,12 @@ function calculateReward(v, prevProgress, frame) {
   if (up.y < 0.5) reward -= 100;
 
   if (progressGain < -0.005) reward -= 30;
+
+  // Steering smoothness penalty
+  if (v.lastAction) {
+    const steerDelta = Math.abs(action.steering - v.lastAction.steering);
+    reward -= steerDelta * 3.0;
+  }
 
   return reward;
 }
@@ -362,7 +369,7 @@ function updateNeuralAI(v, dt, frame) {
   let reward = 0;
 
   if (v.lastState && v.lastAction) {
-    reward = calculateReward(v, v.lastProgress, frame);
+    reward = calculateReward(v, v.lastProgress, action, frame);
   }
 
   // Stuck

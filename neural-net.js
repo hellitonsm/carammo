@@ -1,7 +1,6 @@
 /**
- * Pure JS neural network using Float64Array storage.
+ * Pure JS neural network using Float64Array storage with RMSProp Optimizer.
  * Architecture: input 12 → hidden [32, 24, 16] → output 2
- * Hidden: ReLU · Output: tanh (steering), sigmoid (throttle)
  */
 class NeuralNetwork {
   constructor(inputSize = 12, hiddenSizes = [32, 24, 16], outputSize = 2) {
@@ -16,17 +15,26 @@ class NeuralNetwork {
     this._activations = [];
     this._preActivations = [];
 
+    // RMSProp cache
+    this._vWeights = [];
+    this._vBiases = [];
+
     for (let i = 0; i < this.numLayers; i++) {
       const rows = this.layerSizes[i + 1];
       const cols = this.layerSizes[i];
       const scale = Math.sqrt(2 / cols); // He init
       const w = new Float64Array(rows * cols);
       for (let j = 0; j < w.length; j++) w[j] = (Math.random() * 2 - 1) * scale;
+
       this.weights.push(w);
       this.biases.push(new Float64Array(rows));
       this._activations.push(new Float64Array(rows));
       this._preActivations.push(new Float64Array(rows));
+
+      this._vWeights.push(new Float64Array(rows * cols));
+      this._vBiases.push(new Float64Array(rows));
     }
+
     this._input = new Float64Array(inputSize);
     this._deltas = [];
     for (let i = 0; i < this.numLayers; i++) {
@@ -57,11 +65,9 @@ class NeuralNetwork {
         pre[r] = sum;
         if (isOutput) {
           if (r === 0) {
-            // tanh for steering
-            act[r] = Math.tanh(sum);
+            act[r] = Math.tanh(sum); // steering
           } else {
-            // sigmoid for throttle
-            act[r] = 1 / (1 + Math.exp(-Math.max(-20, Math.min(20, sum))));
+            act[r] = 1 / (1 + Math.exp(-Math.max(-20, Math.min(20, sum)))); // throttle
           }
         } else {
           act[r] = sum > 0 ? sum : 0; // ReLU
@@ -75,24 +81,19 @@ class NeuralNetwork {
   }
 
   trainSingle(target, lr) {
-    // Forward already stored in _activations / _preActivations from last predict
-    // Backprop
     const last = this.numLayers - 1;
     const outAct = this._activations[last];
-    const outPre = this._preActivations[last];
     const outDelta = this._deltas[last];
 
-    // Output deltas
-    // steering (tanh): d/dx tanh = 1 - t^2
     const e0 = outAct[0] - target[0];
-    outDelta[0] = e0 * (1 - outAct[0] * outAct[0]);
-    // throttle (sigmoid): d/dx sig = s(1-s)
+    outDelta[0] = e0 * (1 - outAct[0] * outAct[0]); // d/dx tanh
+
     const e1 = outAct[1] - target[1];
-    outDelta[1] = e1 * outAct[1] * (1 - outAct[1]);
+    outDelta[1] = e1 * outAct[1] * (1 - outAct[1]); // d/dx sigmoid
 
     const mse = (e0 * e0 + e1 * e1) / 2;
 
-    // Hidden deltas (backwards)
+    // Backpropagation
     for (let L = last - 1; L >= 0; L--) {
       const rows = this.layerSizes[L + 1];
       const nextRows = this.layerSizes[L + 2];
@@ -106,12 +107,14 @@ class NeuralNetwork {
         for (let nr = 0; nr < nextRows; nr++) {
           sum += nextW[nr * rows + r] * nextDelta[nr];
         }
-        // ReLU derivative
-        delta[r] = pre[r] > 0 ? sum : 0;
+        delta[r] = pre[r] > 0 ? sum : 0; // ReLU derivative
       }
     }
 
-    // Update weights
+    // RMSProp optimizer
+    const decay = 0.9;
+    const eps = 1e-8;
+
     for (let L = 0; L < this.numLayers; L++) {
       const rows = this.layerSizes[L + 1];
       const cols = this.layerSizes[L];
@@ -120,11 +123,19 @@ class NeuralNetwork {
       const delta = this._deltas[L];
       const prevAct = L === 0 ? this._input : this._activations[L - 1];
 
+      const vW = this._vWeights[L];
+      const vB = this._vBiases[L];
+
       for (let r = 0; r < rows; r++) {
-        b[r] -= lr * delta[r];
+        vB[r] = decay * vB[r] + (1 - decay) * delta[r] * delta[r];
+        b[r] -= (lr / (Math.sqrt(vB[r]) + eps)) * delta[r];
+
         const off = r * cols;
         for (let c = 0; c < cols; c++) {
-          w[off + c] -= lr * delta[r] * prevAct[c];
+          const idx = off + c;
+          const gradW = delta[r] * prevAct[c];
+          vW[idx] = decay * vW[idx] + (1 - decay) * gradW * gradW;
+          w[idx] -= (lr / (Math.sqrt(vW[idx]) + eps)) * gradW;
         }
       }
     }

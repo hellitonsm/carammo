@@ -3,6 +3,21 @@
 ## [Unreleased]
 
 ### Added
+- **RMSProp optimizer** na rede neural — adapta taxa de aprendizado por peso, evita gradientes que explodem/desaparecem
+- **Ruído Gaussiano (Box-Muller)** na exploração — substitui epsilon-greedy discreto por perturbação contínua suave nas ações
+- **Baseline de vantagem dinâmica** (`runningRewardAvg`) — IA só reforça ações acima da média esperada
+- **Velocidade lateral (G-Force)** em `state[11]` — rede neural agora detecta oversteer/derrapagem
+- **Penalidade de suavidade no volante** (`steerDelta * 3.0`) — incentiva traçados limpos e reduz oscilações
+
+### Changed
+- Rede neural: SGD puro → RMSProp (decay=0.9, eps=1e-8), LR 0.003→0.0005
+- Exploração: ações discretas aleatórias → ruído Gaussiano contínuo sobre saídas da rede
+- Treinamento: batch 32→64, gamma 0.95→0.98, epsilon 0.6→0.4, epsilonMin 0.05→0.02, decay 0.9997→0.9995
+- Removido targetNetwork e targetUpdateFreq (estavam declarados mas nunca usados no treinamento)
+- Save version bump v2→v3 com persistência do `runningRewardAvg`
+
+### Fixed
+- Bug em `softUpdate()`: `ob[ob]` → `ob[j]` (indexação incorreta do array de biases)
 - **Sistema de gerenciamento completo** (`js/manager.js`) — catálogo de carros, loja de peças, upgrades, reparos, compra/venda de veículos
 - Overlay de gerenciamento com sidebar (📊 Visão Geral, 🏎 Garagem, 🔧 Oficina, 🏪 Loja de Carros, ⚙️ Loja de Peças)
 - 5 carros jogáveis com tiers (D, C, B, A, S): Carammo GT, Viper RS, Falcon X, Phantom S, Titan SS

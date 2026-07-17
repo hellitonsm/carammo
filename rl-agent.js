@@ -1,5 +1,5 @@
 /**
- * DQN-style RL agent with replay buffer.
+ * RL Agent with Gaussian noise exploration and baseline advantage.
  * Depends on global NeuralNetwork from neural-net.js
  */
 class ReplayBuffer {
@@ -44,17 +44,15 @@ class RLAgent {
     this.hiddenSizes = hiddenSizes;
     this.outputSize = outputSize;
 
-    this.learningRate = options.learningRate ?? 0.003;
-    this.gamma = options.gamma ?? 0.95;
-    this.epsilon = options.epsilon ?? 0.6;
-    this.epsilonMin = options.epsilonMin ?? 0.05;
-    this.epsilonDecay = options.epsilonDecay ?? 0.9997;
-    this.batchSize = options.batchSize ?? 32;
+    this.learningRate = options.learningRate ?? 0.0005;
+    this.gamma = options.gamma ?? 0.98;
+    this.epsilon = options.epsilon ?? 0.4;
+    this.epsilonMin = options.epsilonMin ?? 0.02;
+    this.epsilonDecay = options.epsilonDecay ?? 0.9995;
+    this.batchSize = options.batchSize ?? 64;
     this.maxBufferSize = options.bufferSize ?? 30000;
-    this.targetUpdateFreq = options.targetUpdateFreq ?? 500;
 
     this.qNetwork = new NeuralNetwork(inputSize, hiddenSizes, outputSize);
-    this.targetNetwork = this.qNetwork.clone();
     this.buffer = new ReplayBuffer(this.maxBufferSize);
 
     this.trainSteps = 0;
@@ -62,10 +60,12 @@ class RLAgent {
     this.losses = [];
     this.avgReward = 0;
 
+    // Running reward average for baseline advantage
+    this.runningRewardAvg = 0;
+
     this.steeringActions = [-1, -0.5, -0.25, 0, 0.25, 0.5, 1];
     this.throttleActions = [0, 0.25, 0.5, 0.75, 1.0];
 
-    // Auto-save
     if (typeof window !== 'undefined') {
       window.addEventListener('beforeunload', () => this.save('car-ai-agent'));
       document.addEventListener('visibilitychange', () => {
@@ -79,24 +79,28 @@ class RLAgent {
   }
 
   selectAction(state, explore = true) {
+    const [rawSteer, rawThrottle] = this.qNetwork.predict(state);
+
+    let steer = rawSteer;
+    let throttle = rawThrottle;
+
+    // Gaussian noise exploration (Box-Muller)
     if (explore && Math.random() < this.epsilon) {
-      // Biased random: 70% throttle >= 0.5
-      const steer = this.steeringActions[Math.floor(Math.random() * this.steeringActions.length)];
-      let throttle;
-      if (Math.random() < 0.7) {
-        const high = this.throttleActions.filter((t) => t >= 0.5);
-        throttle = high[Math.floor(Math.random() * high.length)];
-      } else {
-        throttle = this.throttleActions[Math.floor(Math.random() * this.throttleActions.length)];
-      }
-      return { steering: steer, throttle };
+      const u1 = Math.random() || 0.0001;
+      const u2 = Math.random() || 0.0001;
+      const noise = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+
+      steer += noise * 0.25;
+      throttle += noise * 0.15;
     }
 
-    const [s, t] = this.qNetwork.predict(state);
-    const steer = this._nearest(this.steeringActions, s);
-    let throttle = this._nearest(this.throttleActions, t);
-    if (throttle < 0.25) throttle = 0.25;
-    return { steering: steer, throttle };
+    steer = Math.max(-1, Math.min(1, steer));
+    throttle = Math.max(0.1, Math.min(1, throttle));
+
+    const finalSteer = this._nearest(this.steeringActions, steer);
+    const finalThrottle = this._nearest(this.throttleActions, throttle);
+
+    return { steering: finalSteer, throttle: finalThrottle };
   }
 
   _nearest(arr, val) {
@@ -128,20 +132,28 @@ class RLAgent {
     const batch = this.buffer.sample(this.batchSize);
     let totalLoss = 0;
 
+    // Update running reward average for baseline
+    let batchRewardSum = 0;
+    for (const exp of batch) batchRewardSum += exp.reward;
+    const batchRewardAvg = batchRewardSum / batch.length;
+    this.runningRewardAvg = 0.98 * this.runningRewardAvg + 0.02 * batchRewardAvg;
+
     for (const exp of batch) {
       const currentOutput = this.qNetwork.predict(exp.state);
-      const nr = Math.tanh(exp.reward * 0.001);
-      const rs = Math.min(1, Math.abs(nr)) * Math.sign(nr || 1);
-      const alpha = 0.3;
 
-      let targetSteering = currentOutput[0] + alpha * rs * (exp.action.steering - currentOutput[0]);
-      let targetThrottle = currentOutput[1] + alpha * rs * (exp.action.throttle - currentOutput[1]);
+      // Advantage = reward - running baseline
+      const advantage = exp.reward - this.runningRewardAvg;
+      const scaledAdvantage = Math.tanh(advantage * 0.05);
+
+      // Move network toward good actions, away from bad ones
+      let targetSteering = currentOutput[0] + scaledAdvantage * (exp.action.steering - currentOutput[0]);
+      let targetThrottle = currentOutput[1] + scaledAdvantage * (exp.action.throttle - currentOutput[1]);
 
       targetSteering = Math.max(-1, Math.min(1, targetSteering));
       targetThrottle = Math.max(0, Math.min(1, targetThrottle));
 
       if (exp.done && exp.reward < -50) {
-        targetThrottle = Math.max(0, targetThrottle - 0.3);
+        targetThrottle = Math.max(0, targetThrottle - 0.2);
       }
 
       const loss = this.qNetwork.trainSingle([targetSteering, targetThrottle], this.learningRate);
@@ -153,10 +165,6 @@ class RLAgent {
     this.losses.push(avgLoss);
     if (this.losses.length > 500) this.losses.shift();
 
-    if (this.trainSteps % this.targetUpdateFreq === 0) {
-      this.targetNetwork = this.qNetwork.clone();
-    }
-
     this.epsilon = Math.max(this.epsilonMin, this.epsilon * this.epsilonDecay);
     return avgLoss;
   }
@@ -164,13 +172,14 @@ class RLAgent {
   save(name = 'car-ai-agent') {
     try {
       const data = {
-        version: 2,
+        version: 3,
         qNetwork: this.qNetwork.toJSON(),
         epsilon: this.epsilon,
         trainSteps: this.trainSteps,
         episodeRewards: this.episodeRewards.slice(-500),
         losses: this.losses.slice(-500),
         avgReward: this.avgReward,
+        runningRewardAvg: this.runningRewardAvg,
         hyperparams: {
           learningRate: this.learningRate,
           gamma: this.gamma,
@@ -214,12 +223,12 @@ class RLAgent {
         data.hyperparams || {}
       );
       agent.qNetwork = NeuralNetwork.fromJSON(data.qNetwork);
-      agent.targetNetwork = agent.qNetwork.clone();
       agent.epsilon = data.epsilon ?? agent.epsilon;
       agent.trainSteps = data.trainSteps || 0;
       agent.episodeRewards = data.episodeRewards || [];
       agent.losses = data.losses || [];
       agent.avgReward = data.avgReward || 0;
+      agent.runningRewardAvg = data.runningRewardAvg || 0;
       return agent;
     } catch (e) {
       console.warn('RLAgent.load failed', e);
